@@ -50,10 +50,18 @@ console.log('After importing verifyToken:', verifyToken);
         const dbClient = await connect();
         const collection = dbClient.collection("users");
 
-        // Check if the account already exists
-        const userExists = await collection.findOne({ account });
+        // Check if the account or email already exists
+        const userExists = await collection.findOne({
+          $or: [
+              { account: req.body.account },
+              { email: req.body.email }
+          ]
+        });
+
         if (userExists) {
-            return next(new AppError(400, 'Account already exists'));
+          // Determine the error message based on what already exists
+          const errorMessage = userExists.account === req.body.account ? 'Account already exists' : 'Email already exists';
+          return next(new AppError(400, errorMessage));
         }
 
         // Hash password
@@ -102,7 +110,7 @@ router.post('/login', async (req, res, next) => {
       }
 
       generateSendJWT(user, 200, res);
-      
+
   } catch (error) {
       next(error);
   }
