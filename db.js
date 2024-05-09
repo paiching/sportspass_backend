@@ -14,6 +14,7 @@ const connect = async () => {
         serverApi: ServerApiVersion.v1,
         // useNewUrlParser: true,  //depreicated
         // useUnifiedTopology: true,
+        useCreateIndex: true // This ensures that Mongoose will create indexes as defined in model schemas
       });
     }
     await client.connect();
