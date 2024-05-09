@@ -1,5 +1,5 @@
 require('dotenv').config({ path: './.env' });
-console.log("MongoDB URI:", process.env.DATABASE_Atlas);
+//console.log("MongoDB URI:", process.env.DATABASE_Atlas);
 
 var express = require('express');
 var cors = require('cors');
@@ -21,7 +21,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
-app.use('/', usersRouter);
+app.use('/api/v1/user', usersRouter);
 
 
 module.exports = app;

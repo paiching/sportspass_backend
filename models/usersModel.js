@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema({
     role: { type: Number, required: true},
     gender: { type: Number },
     address: { type: String },
-    phone: { type: String, required: true },
+    phone: { type: String },
     nickname: { type: String},
     subscribes: { type: Schema.Types.ObjectId },
     favorites: { type: Schema.Types.ObjectId },
