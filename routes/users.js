@@ -8,7 +8,7 @@ const User = require("../models/usersModel");
 const { client, connect } = require('../db');
 const AppError = require('../appError');
 const  verifyToken  = require('../middlewares/verifyToken');  // Ensure this path is correct
-console.log('After importing verifyToken:', verifyToken);
+
 
   /* JWT */
   const generateSendJWT = (user, statusCode, res) => {
@@ -43,9 +43,11 @@ console.log('After importing verifyToken:', verifyToken);
 
 
   router.post('/register', async (req, res, next) => {
-    try {
-        const { account, password, email, phone, role } = req.body;
 
+    const { account, password, email, phone, role } = req.body;
+    console.log("Received:", req.body);  // Logging the received body to check if all data is received correctly
+    
+    try {
         // Connect to the database
         const dbClient = await connect();
         const collection = dbClient.collection("users");
@@ -53,42 +55,44 @@ console.log('After importing verifyToken:', verifyToken);
         // Check if the account or email already exists
         const userExists = await collection.findOne({
           $or: [
-              { account: req.body.account },
-              { email: req.body.email }
+              { account },
+              { email }
           ]
         });
 
         if (userExists) {
-          // Determine the error message based on what already exists
-          const errorMessage = userExists.account === req.body.account ? 'Account already exists' : 'Email already exists';
-          return next(new AppError(400, errorMessage));
+          const errorMessage = userExists.account === account ? 'Account already exists' : 'Email already exists';
+          return res.status(400).json({ error: errorMessage });
         }
 
         // Hash password
+        if (!password) throw new Error('Password is required');  // Check if password is not undefined
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
         // Insert the new user
-        const result  = await collection.insertOne({
+        const result = await collection.insertOne({
             account,
             email,
             password: hashedPassword,
             phone,
-            role
+            role,
+            createdAt: new Date(),  // Manually set the creation date
+            updatedAt: new Date()   // Manually set the update date
         });
 
-      if (result.acknowledged) {
-          // Fetch the newly created user document to pass to generateSendJWT
+        if (result.acknowledged) {
           const newUser = await collection.findOne({ _id: result.insertedId });
           generateSendJWT(newUser, 201, res);
-      } else {
+        } else {
           throw new Error('User registration failed');
-      }
+        }
     } catch (error) {
         console.error("Error in sign-up route:", error);
-        next(error);
+        next(error);  // Ensure `next` is properly defined or use res.status(500).json({ error: 'Internal Server Error' });
     }
 });
+
 
 
 router.post('/login', async (req, res, next) => {
@@ -99,7 +103,7 @@ router.post('/login', async (req, res, next) => {
   }
 
   try {
-    const dbClient = await connect();
+        const dbClient = await connect();
         const collection = dbClient.collection("users");
 
         // Check if the account already exists

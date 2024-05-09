@@ -9,8 +9,10 @@ var logger = require('morgan');
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
+const handleError = require('./middlewares/errorHandler');
 
 var app = express();
+app.use(express.json());
 
 app.use(cors());
 app.use(logger('dev'));
@@ -19,9 +21,20 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
+//middleware
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
 app.use('/api/v1/user', usersRouter);
 
+// After all other routes
+app.use((req, res, next) => {
+    res.status(404).json({
+        status: 'fail',
+        message: `Cannot find ${req.originalUrl} on this server!`
+    });
+});
+
+// 在所有路由之後加入錯誤處理middleware
+//app.use(handleError);
 
 module.exports = app;
