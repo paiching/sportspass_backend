@@ -27,15 +27,13 @@ console.log('After importing verifyToken:', verifyToken);
     });
   };
 
-
   /* GET users listing. */
-  router.get('/', verifyToken, async (req, res) => {
-    console.log('Inside the route');
+  router.get('/list', verifyToken, async (req, res) => {
+ 
     try {
       const dbClient = await connect();
       const collection = dbClient.collection("users");
       const users = await collection.find({}).toArray();
-      console.log(users);
       res.status(200).json(users);
     } catch (error) {
       console.error("Database query failed", error);
@@ -71,7 +69,7 @@ console.log('After importing verifyToken:', verifyToken);
             role
         });
 
-        if (result.acknowledged) {
+      if (result.acknowledged) {
           // Fetch the newly created user document to pass to generateSendJWT
           const newUser = await collection.findOne({ _id: result.insertedId });
           generateSendJWT(newUser, 201, res);
@@ -98,12 +96,13 @@ router.post('/login', async (req, res, next) => {
 
         // Check if the account already exists
         const user = await collection.findOne({ email });
-      //const user = await User.findOne({ email }).select('+password');
+
       if (!user || !(await bcrypt.compare(password, user.password))) {
           return next(new AppError(401, 'Incorrect email or password'));
       }
 
       generateSendJWT(user, 200, res);
+      
   } catch (error) {
       next(error);
   }
