@@ -7,8 +7,7 @@ const mongoose = require('mongoose');
 const User = require("../models/usersModel"); 
 const { client, connect } = require('../db');
 const AppError = require('../appError');
-const  verifyToken  = require('../middlewares/verifyToken');  // Ensure this path is correct
-
+const  verifyToken  = require('../middlewares/verifyToken');  
 
   /* JWT */
   const generateSendJWT = (user, statusCode, res) => {
