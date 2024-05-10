@@ -77,6 +77,7 @@ const  verifyToken  = require('../middlewares/verifyToken');  // Ensure this pat
             password: hashedPassword,
             phone,
             role,
+            active: true,
             createdAt: new Date(),  // Manually set the creation date
             updatedAt: new Date()   // Manually set the update date
         });
@@ -119,5 +120,88 @@ router.post('/login', async (req, res, next) => {
       next(error);
   }
 });
+
+router.patch('/:id', verifyToken, async (req, res, next) => {
+  const userId = req.params.id;
+  const updates = req.body;
+
+  try {
+    const dbClient = await connect();
+    const collection = dbClient.collection("users");
+
+    // Check if the user exists
+    const user = await collection.findOne({ _id: new mongoose.Types.ObjectId(userId) });
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    // Perform updates, including password hashing if necessary
+    if (updates.password) {
+      const salt = await bcrypt.genSalt(10);
+      updates.password = await bcrypt.hash(updates.password, salt);
+    }
+
+    // Update the user document
+    const result = await collection.updateOne({ _id: new mongoose.Types.ObjectId(userId) }, { $set: updates });
+    if (result.modifiedCount === 1) {
+      // Fetch the updated user data to include in the response
+      const updatedUser = await collection.findOne({ _id: new mongoose.Types.ObjectId(userId) });
+      return res.status(200).json({
+        status: 'success',
+        data: {
+          user: updatedUser
+        }
+      });
+    } else {
+      throw new Error('User update failed');
+    }
+  } catch (error) {
+    console.error("Error in update user route:", error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal Server Error'
+    });
+  }
+});
+
+
+router.delete('/:id', verifyToken, async (req, res, next) => {
+  const userId = req.params.id;
+
+  try {
+    const dbClient = await connect();
+    const collection = dbClient.collection("users");
+
+    // Check if the user exists
+    const user = await collection.findOne({ _id: new mongoose.Types.ObjectId(userId) });
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    // Soft delete the user by marking as inactive
+    const result = await collection.updateOne({ _id: new mongoose.Types.ObjectId(userId) }, { $set: { active: false } });
+    if (result.modifiedCount === 1) {
+      return res.status(200).json({
+        status: 'success',
+        data: {}
+      }); // Successfully soft deleted, return success status and empty data
+    } else {
+      throw new Error('User soft deletion failed');
+    }
+  } catch (error) {
+    console.error("Error in delete user route:", error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal Server Error'
+    });
+  }
+});
+
 
 module.exports = router;

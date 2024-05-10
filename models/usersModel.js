@@ -12,7 +12,8 @@ const userSchema = new mongoose.Schema({
   nickname: { type: String },
   subscribes: { type: Schema.Types.ObjectId },
   favorites: { type: Schema.Types.ObjectId },
-  notification: { type: Boolean }
+  notification: { type: Boolean },
+  active: { type: Boolean }
 }, {
   timestamps: true // This should automatically add createdAt and updatedAt fields
 });
