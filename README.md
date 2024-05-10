@@ -1,2 +1,3 @@
 # sportspass_backend
-sportspass backend
+npm install 安裝
+npm run start 起服務
