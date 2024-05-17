@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema({
   role: { type: Number, required: true },
   gender: { type: Number },
   address: { type: String },
+  photo: { type: String }, 
   nickname: { type: String },
   subscribes: { type: Schema.Types.ObjectId },
   favorites: { type: Schema.Types.ObjectId },

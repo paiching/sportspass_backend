@@ -28,17 +28,59 @@ const  verifyToken  = require('../middlewares/verifyToken');
 
   /* GET users listing. */
   router.get('/list', verifyToken, async (req, res) => {
- 
     try {
       const dbClient = await connect();
       const collection = dbClient.collection("users");
-      const users = await collection.find({}).toArray();
-      res.status(200).json(users);
+  
+      const users = await collection.find({}, { projection: { password: 0 } }).toArray(); // Exclude the password field
+  
+      res.status(200).json({
+        status: 'success',
+        data: {
+          users
+        }
+      });
     } catch (error) {
       console.error("Database query failed", error);
       res.status(500).send("Error accessing the database");
     }
   });
+  
+
+  router.get('/profile/:id', verifyToken, async (req, res, next) => {
+    const userId = req.params.id;
+  
+    try {
+      const dbClient = await connect();
+      const collection = dbClient.collection("users");
+  
+      const user = await collection.findOne(
+        { _id: new mongoose.Types.ObjectId(userId) },
+        { projection: { password: 0 } } // Exclude the password field
+      );
+  
+      if (!user) {
+        return res.status(404).json({
+          status: 'error',
+          message: 'User not found'
+        });
+      }
+  
+      res.status(200).json({
+        status: 'success',
+        data: {
+          user
+        }
+      });
+    } catch (error) {
+      console.error("Error in get user profile route:", error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal Server Error'
+      });
+    }
+  });
+  
 
 
   router.post('/register', async (req, res, next) => {
@@ -147,7 +189,7 @@ router.patch('/:id', verifyToken, async (req, res, next) => {
     const result = await collection.updateOne({ _id: new mongoose.Types.ObjectId(userId) }, { $set: updates });
     if (result.modifiedCount === 1) {
       // Fetch the updated user data to include in the response
-      const updatedUser = await collection.findOne({ _id: new mongoose.Types.ObjectId(userId) });
+      const updatedUser = await collection.findOne({ _id: new mongoose.Types.ObjectId(userId) },{ projection: { password: 0 } });
       return res.status(200).json({
         status: 'success',
         data: {
