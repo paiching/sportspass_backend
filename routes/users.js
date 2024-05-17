@@ -189,7 +189,11 @@ router.patch('/:id', verifyToken, async (req, res, next) => {
     const result = await collection.updateOne({ _id: new mongoose.Types.ObjectId(userId) }, { $set: updates });
     if (result.modifiedCount === 1) {
       // Fetch the updated user data to include in the response
-      const updatedUser = await collection.findOne({ _id: new mongoose.Types.ObjectId(userId) },{ projection: { password: 0 } });
+      const updatedUser = await collection.findOne(
+        { _id: new mongoose.Types.ObjectId(userId) },
+        { projection: { password: 0 } } 
+      );
+
       return res.status(200).json({
         status: 'success',
         data: {
