@@ -5,7 +5,7 @@ const validator = require('validator');
 const router = express.Router();
 const mongoose = require('mongoose');
 const User = require("../models/usersModel"); 
-const { client, connect } = require('../db');
+const { client, connect } = require('../dbs');
 const AppError = require('../appError');
 const  verifyToken  = require('../middlewares/verifyToken');  
 
