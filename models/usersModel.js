@@ -4,7 +4,7 @@ const Schema = mongoose.Schema;
 const userSchema = new Schema({
   account: { type: String, required: true, unique: true },
   password: { type: String, required: true, select: false },
-  email: { type: String, required: true, unique: true, lowercase: true },
+  email: { type: String, required: true },
   phone: { type: String },
   role: { type: Number, required: true },
   gender: { type: Number },
@@ -12,7 +12,8 @@ const userSchema = new Schema({
   photo: { type: String },
   nickname: { type: String },
   subscribes: [{ type: Schema.Types.ObjectId }],
-  favorites: { type: Schema.Types.ObjectId },
+  focusedEvents: [{ type: Schema.Types.ObjectId }],
+  favorites: [{ type: Schema.Types.ObjectId }],
   notification: { type: Boolean },
   active: { type: Boolean, default: true },
 }, {

@@ -5,6 +5,7 @@ const validator = require('validator');
 const router = express.Router();
 const mongoose = require('mongoose');
 const User = require("../models/usersModel"); 
+const Event = require('../models/eventsModel');
 const Subscription = require('../models/subscriptionModel');
 const AppError = require('../appError');
 const verifyToken = require('../middlewares/verifyToken');  
@@ -33,8 +34,12 @@ router.get('/list', verifyToken, async (req, res) => {
     .populate({
       path: 'subscribes',
       model: Subscription 
-    }); 
-    
+    })
+    .populate({
+      path: 'focusedEvents',
+      model: Event 
+    });
+
     res.status(200).json({
       status: 'success',
       data: {
@@ -55,6 +60,10 @@ router.get('/profile/:id', verifyToken, async (req, res, next) => {
       .populate({
         path: 'subscribes',
         model: Subscription // or 'Subscription' if you prefer
+      })
+      .populate({
+        path: 'focusedEvents',
+        model: Event 
       });
 
     if (!user) {
@@ -85,10 +94,7 @@ router.post('/register', async (req, res, next) => {
   try {
     // Check if the account or email already exists
     const userExists = await User.findOne({
-      $or: [
-          { account },
-          { email }
-      ]
+      $or: [{ account }, { email }]
     });
 
     if (userExists) {
@@ -96,8 +102,12 @@ router.post('/register', async (req, res, next) => {
       return res.status(400).json({ error: errorMessage });
     }
 
+    // Validate that the password is provided
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required' });
+    }
+
     // Hash password
-    if (!password) throw new Error('Password is required');  // Check if password is not undefined
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -109,35 +119,73 @@ router.post('/register', async (req, res, next) => {
       phone,
       role,
       active: true,
-      createdAt: new Date(),  // Manually set the creation date
-      updatedAt: new Date()   // Manually set the update date
+      createdAt: new Date(),
+      updatedAt: new Date()
     });
 
     await newUser.save();
     generateSendJWT(newUser, 201, res);
   } catch (error) {
     console.error("Error in sign-up route:", error);
-    next(error);  // Ensure `next` is properly defined or use res.status(500).json({ error: 'Internal Server Error' });
+    next(error);
   }
 });
 
 router.post('/login', async (req, res, next) => {
-  const { email, password } = req.body;
+  const { email, account, password } = req.body;
 
-  if (!email || !password) {
-      return next(new AppError(400, 'Please provide email and password'));
+  if (!email && !account) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Please provide email or account and password'
+    });
+  }
+
+  if (!password) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Please provide password'
+    });
   }
 
   try {
-    const user = await User.findOne({ email });
+    // Find the user by email or account, ensuring to include the password field
+    const user = await User.findOne({ $or: [{ email }, { account }] }).select('+password');
 
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      return next(new AppError(401, 'Incorrect email or password'));
+    if (!user) {
+      console.error('User not found:', email || account);
+      return res.status(401).json({
+        status: 'error',
+        message: 'Incorrect email/account or password'
+      });
+    }
+
+    if (!user.password) {
+      console.error('Password is undefined for user:', user);
+      return res.status(401).json({
+        status: 'error',
+        message: 'Incorrect email/account or password'
+      });
+    }
+
+    console.log('Comparing passwords for user:', user._id);
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      console.error('Password mismatch for user:', user._id);
+      return res.status(401).json({
+        status: 'error',
+        message: 'Incorrect email/account or password'
+      });
     }
 
     generateSendJWT(user, 200, res);
   } catch (error) {
-    next(error);
+    console.error('Error during login process:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal Server Error'
+    });
   }
 });
 
@@ -176,6 +224,99 @@ router.patch('/:id', verifyToken, async (req, res, next) => {
     });
   } catch (error) {
     console.error("Error in update user route:", error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal Server Error'
+    });
+  }
+});
+
+// PATCH update user subscriptions
+router.patch('/subscription/:id', verifyToken, async (req, res, next) => {
+  const userId = req.params.id;
+  const { subscribes } = req.body;
+
+  try {
+    // Check if the user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    // Update the subscribes field
+    if (subscribes) {
+      user.subscribes = subscribes.map(id => mongoose.Types.ObjectId.createFromHexString(id));
+    }
+
+    user.updatedAt = new Date();
+    await user.save();
+
+    // Populate the subscribes field
+    const populatedUser = await User.findById(userId).populate({
+      path: 'subscribes',
+      model: Subscription 
+    });
+
+    // Exclude the password field from the response
+    populatedUser.password = undefined;
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        user: populatedUser
+      }
+    });
+  } catch (error) {
+    console.error("Error in update user subscriptions route:", error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal Server Error'
+    });
+  }
+});
+
+// Route to empty the subscribes field for a specific user
+router.delete('/subscription/:id', verifyToken, async (req, res) => {
+  const userId = req.params.id;
+  const { subscribes } = req.body;
+
+  try {
+    // Check if the user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    // Update the subscribes field
+    if (subscribes) {
+      user.subscribes = subscribes.map(id => mongoose.Types.ObjectId.createFromHexString(id));
+    }
+
+    // Set the subscribes field to an empty array
+    //user.subscribes = [];
+    user.updatedAt = new Date();
+    await user.save();
+
+    // Populate the subscribes field
+    const populatedUser = await User.findById(userId).populate({
+      path: 'subscribes',
+      model: Subscription 
+    });
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        user: populatedUser
+      }
+    });
+  } catch (error) {
+    console.error("Error in unsubscribe route:", error);
     res.status(500).json({
       status: 'error',
       message: 'Internal Server Error'

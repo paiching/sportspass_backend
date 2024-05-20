@@ -111,15 +111,73 @@ router.get('/list', async (req, res) => {
   }
 });
 
-/* GET a specific event by ID, including related orders. */
+// GET events based on display mode
+router.get('/:displayMode', async (req, res) => {
+  const displayMode = req.params.displayMode;
+
+  try {
+    let query = {};
+    const now = new Date();
+
+    switch (displayMode) {
+      case 'all':
+        query = {}; // No filter, fetch all events
+        break;
+      case 'recent':
+        query = { eventDate: { $gte: now } }; // Events happening from now onwards
+        break;
+      case 'latestSell':
+        query = { releaseDate: { $lte: now } }; // Events that are newly released for selling
+        break;
+      case 'latest':
+        query = {}; // Assuming latest events means sorting by createdAt
+        break;
+      case 'hot':
+        query = {}; // Assuming hot events are determined by a field, e.g., popularity
+        break;
+      case 'upcoming':
+        query = { eventDate: { $gte: now, $lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) } }; // Events happening within a week
+        break;
+      case 'other':
+        query = {}; // Custom logic for other events if necessary
+        break;
+      default:
+        return res.status(400).json({
+          status: 'error',
+          message: 'Invalid display mode'
+        });
+    }
+
+    let events = await Event.find(query)
+      .populate('sessionIds')
+      .sort(displayMode === 'latest' ? { createdAt: -1 } : {});
+
+    // Replace sessionIds with sessionList
+    const eventsWithSessionList = events.map(event => {
+      const eventObject = event.toObject();
+      eventObject.sessionList = eventObject.sessionIds;
+      delete eventObject.sessionIds;
+      return eventObject;
+    });
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        events: eventsWithSessionList
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching events", error);
+    res.status(500).send("Error fetching events");
+  }
+});
+
+/* GET a specific event by ID, including related sessions. */
 router.get('/:id', async (req, res) => {
   try {
     const event = await Event.findById(req.params.id)
-      // .populate('categoryId')
-      // .populate('tagId')
       .populate('sessionIds')
-      // .populate('sponsorId')
-      // .populate('favoriteIds');
+      .exec();
 
     if (!event) {
       return res.status(404).json({
@@ -128,14 +186,15 @@ router.get('/:id', async (req, res) => {
       });
     }
 
-    // 获取与此 eventId 相关的订单
-    const orders = await Order.find({ eventId: req.params.id });
+    // Convert to plain object to manipulate
+    const eventObject = event.toObject();
+    eventObject.sessionList = eventObject.sessionIds;
+    delete eventObject.sessionIds;
 
     res.status(200).json({
       status: 'success',
       data: {
-        event,
-        orders
+        event: eventObject
       }
     });
   } catch (error) {
