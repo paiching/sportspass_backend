@@ -2,8 +2,8 @@ require('dotenv').config({ path: './.env' });
 //console.log("MongoDB URI:", process.env.DATABASE_Atlas);
 
 var express = require('express');
-const connectDBs = require('./db'); // 引入新的db连接文件
-const connectDB = require('./dbs'); // 引入新的db连接文件
+const connectDBs = require('./db'); 
+//const connectDB = require('./dbs'); 
 var cors = require('cors');
 var path = require('path');
 var cookieParser = require('cookie-parser');
@@ -14,6 +14,7 @@ var usersRouter = require('./routes/users');
 var ticketsRouter = require('./routes/tickets');
 var eventsRouter = require('./routes/events');
 var sessionsRouter = require('./routes/sessions');
+var tagsRouter = require('./routes/tags');
 var notificationsRouter = require('./routes/notifications');
 var subscriptionsRouter = require('./routes/subscriptions');
 const handleError = require('./middlewares/errorHandler');
@@ -30,13 +31,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 connectDBs();
 
-//middleware
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
 app.use('/api/v1/user', usersRouter);
 app.use('/api/v1/ticket', ticketsRouter);
 app.use('/api/v1/event', eventsRouter);
 app.use('/api/v1/session', sessionsRouter);
+app.use('/api/v1/tag', tagsRouter);
 app.use('/api/v1/notification', notificationsRouter);
 app.use('/api/v1/subscription', subscriptionsRouter);
 
