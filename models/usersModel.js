@@ -11,7 +11,7 @@ const userSchema = new Schema({
   address: { type: String },
   photo: { type: String },
   nickname: { type: String },
-  subscribes: { type: Schema.Types.ObjectId },
+  subscribes: [{ type: Schema.Types.ObjectId }],
   favorites: { type: Schema.Types.ObjectId },
   notification: { type: Boolean },
   active: { type: Boolean, default: true },

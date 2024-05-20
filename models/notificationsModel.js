@@ -10,7 +10,9 @@ const notificationSchema = new Schema({
     title: { type: String, required: true },
     url: { type: String }, 
     userInfo: [userInfoSchema], 
-    createdAt: { type: Date, default: Date.now, required: true }
+    status: { type: Number }, 
+    createdAt: { type: Date, default: Date.now, required: true },
+    sponsorId: { type: mongoose.Schema.ObjectId}
 }, { timestamps: true });
 
 const Notification = mongoose.model('Notification', notificationSchema);

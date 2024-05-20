@@ -12,6 +12,10 @@ var logger = require('morgan');
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 var ticketsRouter = require('./routes/tickets');
+var eventsRouter = require('./routes/events');
+var sessionsRouter = require('./routes/sessions');
+var notificationsRouter = require('./routes/notifications');
+var subscriptionsRouter = require('./routes/subscriptions');
 const handleError = require('./middlewares/errorHandler');
 
 var app = express();
@@ -31,6 +35,10 @@ app.use('/', indexRouter);
 app.use('/users', usersRouter);
 app.use('/api/v1/user', usersRouter);
 app.use('/api/v1/ticket', ticketsRouter);
+app.use('/api/v1/event', eventsRouter);
+app.use('/api/v1/session', sessionsRouter);
+app.use('/api/v1/notification', notificationsRouter);
+app.use('/api/v1/subscription', subscriptionsRouter);
 
 // After all other routes
 app.use((req, res, next) => {

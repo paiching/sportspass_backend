@@ -3,7 +3,7 @@ const Schema = mongoose.Schema;
 
 // Ticket Schema
 const ticketSchema = new Schema({
-  ticketId: { type: Schema.Types.ObjectId, required: true },
+  ticketId: { type: mongoose.Schema.ObjectId, required: true },
   orderId: { type: Schema.Types.ObjectId, ref: 'Order', required: true },
   eventId: { type: Schema.Types.ObjectId, ref: 'Event', required: true },
   sessionId: { type: Schema.Types.ObjectId, ref: 'Session', required: true },

@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const Ticket = require('../models/ticketsModel'); // 确保模型引用正确
 const Order = require('../models/ordersModel'); // 确保模型引用正确
@@ -82,6 +83,39 @@ router.post('/create', async (req, res) => {
     res.status(500).send("Error creating ticket");
   }
 });
+
+
+// Update ticket status by ticketId
+router.patch('/status', async (req, res) => {
+  try {
+    const { ticketId, status } = req.body;
+
+    // Find the ticket by ticketId and update its status
+    const updatedTicket = await Ticket.findOneAndUpdate(
+      { _id: new mongoose.Types.ObjectId(ticketId) },
+      { status: status, updatedAt: new Date() },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedTicket) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Ticket not found'
+      });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        ticket: updatedTicket
+      }
+    });
+  } catch (error) {
+    console.error("Error updating ticket status", error);
+    res.status(500).send("Error updating ticket status");
+  }
+});
+
 
 module.exports = router;
 
