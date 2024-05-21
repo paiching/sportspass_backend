@@ -134,23 +134,24 @@ router.post('/register', async (req, res, next) => {
 router.post('/login', async (req, res, next) => {
   const { email, account, password } = req.body;
 
-  if (!email && !account) {
+  if ((!email && !account) || !password) {
     return res.status(400).json({
       status: 'error',
       message: 'Please provide email or account and password'
     });
   }
 
-  if (!password) {
-    return res.status(400).json({
-      status: 'error',
-      message: 'Please provide password'
-    });
-  }
-
   try {
+    // Construct the query object dynamically
+    let query = {};
+    if (email) {
+      query.email = email;
+    } else if (account) {
+      query.account = account;
+    }
+
     // Find the user by email or account, ensuring to include the password field
-    const user = await User.findOne({ $or: [{ email }, { account }] }).select('+password');
+    const user = await User.findOne(query).select('+password');
 
     if (!user) {
       console.error('User not found:', email || account);
