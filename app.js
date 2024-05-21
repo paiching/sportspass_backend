@@ -40,14 +40,25 @@ app.use('/api/v1/session', sessionsRouter);
 app.use('/api/v1/tag', tagsRouter);
 app.use('/api/v1/notification', notificationsRouter);
 app.use('/api/v1/subscription', subscriptionsRouter);
+//app.use('/api/v1/users/forgotpassword', usersRouter);
+//app.use('/api/v1/users/resetpassword/:token', usersRouter);
 
-// After all other routes
+// 錯誤處理中間件
 app.use((req, res, next) => {
     res.status(404).json({
-        status: 'fail',
-        message: `Cannot find ${req.originalUrl} on this server!`
+      status: 'fail',
+      message: `Cannot find ${req.originalUrl} on this server!`
     });
-});
+  });
+  
+  // 全局錯誤處理
+  app.use((err, req, res, next) => {
+    console.error('ERROR 💥', err);
+    res.status(err.statusCode || 500).json({
+      status: err.status || 'error',
+      message: err.message
+    });
+  });
 
 // 在所有路由之後加入錯誤處理middleware
 //app.use(handleError);

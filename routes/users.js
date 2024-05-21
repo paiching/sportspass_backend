@@ -4,28 +4,31 @@ const jwt = require('jsonwebtoken');
 const validator = require('validator');
 const router = express.Router();
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const User = require("../models/usersModel"); 
 const Event = require('../models/eventsModel');
 const Subscription = require('../models/subscriptionModel');
 const AppError = require('../appError');
 const verifyToken = require('../middlewares/verifyToken');  
+const sendEmail = require('../utils/sendEmail');
+const { generateSendJWT } = require('../utils/jwt');
 
 /* JWT */
-const generateSendJWT = (user, statusCode, res) => {
-  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: process.env.JWT_EXPIRES_DAY
-  });
+// const generateSendJWT = (user, statusCode, res) => {
+//   const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+//       expiresIn: process.env.JWT_EXPIRES_DAY
+//   });
 
-  user.password = undefined; // Hide the password field
+//   user.password = undefined; // Hide the password field
 
-  res.status(statusCode).json({
-      status: 'success',
-      token,
-      data: {
-          user
-      }
-  });
-};
+//   res.status(statusCode).json({
+//       status: 'success',
+//       token,
+//       data: {
+//           user
+//       }
+//   });
+// };
 
 /* GET users listing. */
 router.get('/list', verifyToken, async (req, res) => {
@@ -190,45 +193,101 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-router.patch('/:id', verifyToken, async (req, res, next) => {
-  const userId = req.params.id;
-  const updates = req.body;
+// Forgot Password Route
+router.post('/forgotPassword', async (req, res, next) => {
+  const { email } = req.body;
 
   try {
-    // Check if the user exists
-    const user = await User.findById(userId);
+    const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'User not found'
+      return next(new AppError('沒有使用這個電子郵件地址的用戶。', 404));
+    }
+
+    const resetToken = user.createPasswordResetToken();
+    await user.save({ validateBeforeSave: false });
+
+    const resetURL = `${req.protocol}://${req.get('host')}/api/v1/user/resetPassword/${resetToken}`;
+    const message = `忘記密碼了嗎？提交一個帶有新密碼的 POST 請求到：${resetURL}。如果你沒有忘記密碼，請忽略這封電子郵件！`;
+
+    try {
+      await sendEmail({
+        email: user.email,
+        subject: '你的密碼重置令牌（有效期為 10 分鐘）',
+        message
+      });
+
+      res.status(200).json({
+        status: 'success',
+        message: '令牌已發送到電子郵件！'
+      });
+    } catch (err) {
+      user.passwordResetToken = undefined;
+      user.passwordResetExpires = undefined;
+      await user.save({ validateBeforeSave: false });
+
+      return next(new AppError('發送電子郵件時發生錯誤。稍後再試！', 500));
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Reset Password Routes
+router.get('/resetPassword/:token', async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        status: 'fail',
+        message: 'Token is invalid or has expired'
       });
     }
 
-    // Perform updates, including password hashing if necessary
-    if (updates.password) {
-      const salt = await bcrypt.genSalt(10);
-      updates.password = await bcrypt.hash(updates.password, salt);
+    // Render a form for the user to enter a new password
+    res.status(200).send(`
+      <form action="/api/v1/user/resetPassword/${token}" method="POST">
+        <input type="password" name="password" placeholder="New Password" required />
+        <button type="submit">Reset Password</button>
+      </form>
+    `);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/resetPassword/:token', async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        status: 'fail',
+        message: 'Token is invalid or has expired'
+      });
     }
 
-    // Update the user document
-    Object.assign(user, updates, { updatedAt: new Date() });
+    // Hash the new password before saving
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(password, salt);
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
     await user.save();
 
-    // Exclude the password field from the response
-    user.password = undefined;
-
-    res.status(200).json({
-      status: 'success',
-      data: {
-        user
-      }
-    });
+    generateSendJWT(user, 200, res);
   } catch (error) {
-    console.error("Error in update user route:", error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal Server Error'
-    });
+    next(error);
   }
 });
 
