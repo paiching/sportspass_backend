@@ -197,6 +197,13 @@ router.post('/login', async (req, res, next) => {
 router.post('/forgotPassword', async (req, res, next) => {
   const { email } = req.body;
 
+  console.log('EMAIL_HOST:', process.env.EMAIL_HOST);
+console.log('EMAIL_PORT:', process.env.EMAIL_PORT);
+console.log('EMAIL_USERNAME:', process.env.EMAIL_USERNAME);
+console.log('EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD);
+console.log('EMAIL_FROM:', process.env.EMAIL_FROM);
+
+
   try {
     const user = await User.findOne({ email });
     if (!user) {
@@ -262,6 +269,7 @@ router.get('/resetPassword/:token', async (req, res, next) => {
 });
 
 router.post('/resetPassword/:token', async (req, res, next) => {
+  
   try {
     const { token } = req.params;
     const { password } = req.body;
