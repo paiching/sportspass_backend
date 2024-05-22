@@ -75,7 +75,9 @@ router.get('/checkout', (req, res) => {
         // DelayDay: '0',
         // InvType: '07'
       }
-    
+      
+      console.log('options:', options);
+
       create = new ecpay_payment(options),
       htm = create.payment_client.aio_check_out_all(parameters = base_param, invoice = inv_params)
       console.log(htm)
