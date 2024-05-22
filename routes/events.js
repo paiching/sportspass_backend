@@ -112,7 +112,7 @@ router.get('/list', async (req, res) => {
 });
 
 // GET events based on display mode
-router.get('/:displayMode', async (req, res) => {
+router.get('/mode/:displayMode', async (req, res) => {
   const displayMode = req.params.displayMode;
 
   try {

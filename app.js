@@ -15,6 +15,8 @@ var ticketsRouter = require('./routes/tickets');
 var eventsRouter = require('./routes/events');
 var sessionsRouter = require('./routes/sessions');
 var tagsRouter = require('./routes/tags');
+var ordersRouter = require('./routes/orders');
+var greensRouter = require('./routes/green');
 var notificationsRouter = require('./routes/notifications');
 var subscriptionsRouter = require('./routes/subscriptions');
 const handleError = require('./middlewares/errorHandler');
@@ -31,6 +33,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 connectDBs();
 
+// Set the view engine to EJS
+app.set('view engine', 'ejs');
+
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
 app.use('/api/v1/user', usersRouter);
@@ -40,6 +45,11 @@ app.use('/api/v1/session', sessionsRouter);
 app.use('/api/v1/tag', tagsRouter);
 app.use('/api/v1/notification', notificationsRouter);
 app.use('/api/v1/subscription', subscriptionsRouter);
+app.use('/api/v1/order', ordersRouter);
+app.use('/order', ordersRouter);
+app.use('/green', greensRouter);
+
+
 //app.use('/api/v1/users/forgotpassword', usersRouter);
 //app.use('/api/v1/users/resetpassword/:token', usersRouter);
 

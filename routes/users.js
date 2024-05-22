@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const crypto = require('crypto');
 const User = require("../models/usersModel"); 
 const Event = require('../models/eventsModel');
+const Order = require('../models/ordersModel');
 const Subscription = require('../models/subscriptionModel');
 const AppError = require('../appError');
 const verifyToken = require('../middlewares/verifyToken');  
@@ -457,5 +458,62 @@ router.delete('/:id', verifyToken, async (req, res, next) => {
     });
   }
 });
+
+
+// READ orders by userId
+router.get('/:userId/order', verifyToken, async (req, res) => {
+  try {
+    const orders = await Order.find({ userId: req.params.userId })
+    .populate({
+      path: 'ticketId',
+      populate: [
+        {
+          path: 'eventId',
+          model: 'Event', // Model name of the event
+          select: 'eventName' // Specify the fields you want to include from the Event model
+        },
+        {
+          path: 'sessionId',
+          model: 'Session', // Model name of the session
+          select: 'sessionName sessionTime sessionPlace' // Specify the fields you want to include from the Session model
+        }
+      ]
+    });
+
+    if (!orders || orders.length === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'No orders found for this user'
+      });
+    }
+
+    // Convert ticketId to ticketList, eventId to eventDetail, and sessionId to sessionDetail
+    const ordersWithModifiedFields = orders.map(order => {
+      const orderObject = order.toObject();
+      orderObject.ticketList = orderObject.ticketId.map(ticket => {
+        return {
+          ...ticket,
+          eventDetails: ticket.eventId,
+          sessionDetails: ticket.sessionId,
+          eventId: undefined,
+          sessionId: undefined
+        };
+      });
+      delete orderObject.ticketId;
+      return orderObject;
+    });
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        orders: ordersWithModifiedFields
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching orders by userId", error);
+    res.status(500).send("Error fetching orders by userId");
+  }
+});
+
 
 module.exports = router;
