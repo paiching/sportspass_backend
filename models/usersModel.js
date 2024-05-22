@@ -15,6 +15,7 @@ const userSchema = new Schema({
   subscribes: [{ type: Schema.Types.ObjectId, ref: 'Subscription' }],
   focusedEvents: [{ type: Schema.Types.ObjectId, ref: 'Event' }],
   favorites: [{ type: Schema.Types.ObjectId, ref: 'Favorite' }],
+  orders: [{ type: Schema.Types.ObjectId, ref: 'Order' }],
   notification: { type: Boolean },
   active: { type: Boolean, default: true },
   passwordResetToken: String,

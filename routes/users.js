@@ -183,6 +183,10 @@ router.post('/login', async (req, res, next) => {
       });
     }
 
+    // Remove sensitive fields before sending the response
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+
     generateSendJWT(user, 200, res);
   } catch (error) {
     console.error('Error during login process:', error);
@@ -289,6 +293,44 @@ router.post('/resetPassword/:token', async (req, res, next) => {
     generateSendJWT(user, 200, res);
   } catch (error) {
     next(error);
+  }
+});
+
+router.patch('/:id', verifyToken, async (req, res, next) => {
+  const userId = req.params.id;
+  const updates = req.body;
+
+  try {
+    // Check if the user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+     // Perform updates, including password hashing if necessary
+     if (updates.password) {
+      const salt = await bcrypt.genSalt(10);
+      updates.password = await bcrypt.hash(updates.password, salt);
+    }
+    // Update the user document
+    Object.assign(user, updates, { updatedAt: new Date() });
+    await user.save();
+     // Exclude the password field from the response
+     user.password = undefined;
+     res.status(200).json({
+      status: 'success',
+      data: {
+        user
+      }
+    });
+  } catch (error) {
+    console.error("Error in update user route:", error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal Server Error'
+    });
   }
 });
 
