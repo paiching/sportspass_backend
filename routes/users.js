@@ -95,14 +95,11 @@ router.post('/register', async (req, res, next) => {
   const { account, password, email, phone, role } = req.body;
 
   try {
-    // Check if the account or email already exists
-    const userExists = await User.findOne({
-      $or: [{ account }, { email }]
-    });
+    // Check if the email already exists
+    const emailExists = await User.findOne({ email });
 
-    if (userExists) {
-      const errorMessage = userExists.account === account ? 'Account already exists' : 'Email already exists';
-      return res.status(400).json({ error: errorMessage });
+    if (emailExists) {
+      return res.status(400).json({ error: 'Email already exists' });
     }
 
     // Validate that the password is provided
@@ -110,13 +107,16 @@ router.post('/register', async (req, res, next) => {
       return res.status(400).json({ error: 'Password is required' });
     }
 
+    // If account is not provided, generate a default account based on email
+    const accountToUse = account || email.split('@')[0];
+
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     // Create a new user
     const newUser = new User({
-      account,
+      account: accountToUse,
       email,
       password: hashedPassword,
       phone,
@@ -133,6 +133,7 @@ router.post('/register', async (req, res, next) => {
     next(error);
   }
 });
+
 
 router.post('/login', async (req, res, next) => {
   const { email, account, password } = req.body;
