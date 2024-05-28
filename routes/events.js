@@ -5,11 +5,15 @@ const { Types } = mongoose;
 const Event = require('../models/eventsModel');
 const Order = require('../models/ordersModel');
 const Session = require('../models/sessionsModel');
+const Category = require('../models/categoryModel');
+
 
 
 // GET events listing with pagination based on sponsorId
-router.get('/sponsor', async (req, res) => {
-  const { Id, page = 1, pageSize = 10 } = req.query;
+router.get('/sponsor/:id', async (req, res) => {
+
+  const { page = 1, pageSize = 10 } = req.query;
+  const Id = req.params.id;
 
   try {
     console.log("Fetching events from database...");
@@ -29,26 +33,28 @@ router.get('/sponsor', async (req, res) => {
         //   path: 'sessionIds',
         //   select: 'sessionName'
         // })
-        .populate('sessionIds')
+        .populate('categoryList')
+        .populate('sessionList')
+        .populate('tagList')
         .exec(),
       Event.countDocuments({ sponsorId: sponsorObjectId })
     ]);
 
     // Replace sessionIds with sessionList
-    const eventsWithSessionList = events.map(event => {
-      const eventObject = event.toObject();
-      eventObject.sessionList = eventObject.sessionIds;
-      delete eventObject.sessionIds;
-      return eventObject;
-    });
+    // const eventsWithSessionList = events.map(event => {
+    //   const eventObject = event.toObject();
+    //   eventObject.sessionList = eventObject.sessionIds;
+    //   delete eventObject.sessionIds;
+    //   return eventObject;
+    // });
 
     const totalPages = Math.ceil(totalItems / pageSize);
-    console.log("Events fetched: ", eventsWithSessionList);
+    ///console.log("Events fetched: ", eventsWithSessionList);
 
     res.status(200).json({
       status: 'success',
       data: {
-        events: eventsWithSessionList,
+        events,
         pagination: {
           totalItems,
           totalPages,
