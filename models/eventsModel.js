@@ -10,6 +10,7 @@ const eventSchema = new Schema({
     //categoryId: { type: Schema.Types.ObjectId, ref: 'Category' },
     categoryList: [{ type: Schema.Types.ObjectId, ref: 'Category' }],
     //tagId: [{ type: Schema.Types.ObjectId, ref: 'Tag' }],
+    sponsorId: { type: Schema.Types.ObjectId, ref: 'User' },
     tagList: [{ type: Schema.Types.ObjectId, ref: 'Tag' }],
     releaseDate: { type: Date, required: true },
     eventIntro: { type: String, required: true },

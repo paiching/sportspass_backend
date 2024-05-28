@@ -6,7 +6,7 @@ const Event = require('../models/eventsModel');
 const Order = require('../models/ordersModel');
 const Session = require('../models/sessionsModel');
 const Category = require('../models/categoryModel');
-
+const User = require('../models/usersModel');
 
 
 // GET events listing with pagination based on sponsorId
@@ -149,7 +149,9 @@ router.get('/mode/:displayMode', async (req, res) => {
     }
 
     let events = await Event.find(query)
-      .populate('sessionIds')
+      .populate('sessionList')
+      .populate('categoryList')
+      .populate('tagList')
       .sort(displayMode === 'latest' ? { createdAt: -1 } : {});
 
     // Replace sessionIds with sessionList
@@ -176,7 +178,10 @@ router.get('/mode/:displayMode', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const event = await Event.findById(req.params.id)
-      .populate('sessionIds')
+      .populate('sessionList')
+      .populate('categoryList')
+      .populate('sessionList')
+      .populate('tagList')
       .exec();
 
     if (!event) {
@@ -207,9 +212,9 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const {
-      eventSetting, eventName, eventDate, eventPic,
-      coverPic, smallBanner, categoryId, tagId, releaseDate,
-      eventIntro, sponsorId, favoriteIds, sessionIds
+      eventName, eventDate, eventPic,
+      coverPic, smallBanner, categoryList, tagList, releaseDate,
+      eventIntro, sponsorId, sessionList
     } = req.body;
 
     // 将相关字段转换为 ObjectId 类型
@@ -219,12 +224,13 @@ router.post('/', async (req, res) => {
       eventPic,
       coverPic,
       smallBanner,
-      categoryId: new mongoose.Types.ObjectId,
-      tagId: Array.isArray(tagId) ? tagId.map(id => new mongoose.Types.ObjectId) : [],
+      sponsorId: new mongoose.Types.ObjectId,
+      categoryList: Array.isArray(categoryList) ? categoryList.map(id => new mongoose.Types.ObjectId) : [],
+      tagList: Array.isArray(tagList) ? tagList.map(id => new mongoose.Types.ObjectId) : [],
       releaseDate,
       status: 1,
       eventIntro,
-      sessionIds: Array.isArray(sessionIds) ? sessionIds.map(id => mongoose.Types.ObjectId.createFromHexString(sessionIds)) : [],
+      sessionList: Array.isArray(sessionList) ? sessionList.map(id => new mongoose.Types.ObjectId) : [],
       createdAt: new Date(),
       updatedAt: new Date()
     });
