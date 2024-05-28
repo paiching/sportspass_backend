@@ -25,28 +25,55 @@ router.post('/', async (req, res) => {
   }
 });
 
-// READ all tags with optional type filter
+// READ all tags with optional type filter, search query, and limit
 router.get('/:type?', async (req, res) => {
-    try {
-      const { type } = req.params;
-      let query = {};
-  
-      if (type) {
-        query = { type };
-      }
-  
-      const tags = await Tag.find(query);
-      res.status(200).json({
-        status: 'success',
-        data: {
-          tags
-        }
-      });
-    } catch (error) {
-      console.error('Error fetching tags', error);
-      res.status(500).send('Error fetching tags');
+  try {
+    const { type } = req.params;
+    const { q, limit } = req.query;
+    let query = {};
+
+    // Handle type parameter
+    if (type && type !== 'all') {
+      query.type = type;
     }
-  });
+
+    // Handle search query
+    if (q) {
+      query.name = new RegExp(q, 'i'); // Using a regex for case-insensitive partial matches
+    }
+
+    // Fetch tags from the database
+    let tagsQuery = Tag.find(query);
+
+    // Handle limit parameter
+    if (limit) {
+      tagsQuery = tagsQuery.limit(parseInt(limit));
+    }
+
+    const tags = await tagsQuery;
+
+    // Add pagination details (assuming limit-based pagination)
+    const totalItems = await Tag.countDocuments(query);
+    const totalPages = limit ? Math.ceil(totalItems / limit) : 1;
+    const currentPage = 1; // This example does not include page parameter, adjust as necessary
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        tags
+      },
+      pagination: {
+        totalItems,
+        totalPages,
+        currentPage,
+        pageSize: tags.length
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching tags', error);
+    res.status(500).send('Error fetching tags');
+  }
+});
 
 // READ a specific tag by ID
 router.get('/:id', async (req, res) => {

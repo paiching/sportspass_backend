@@ -5,10 +5,8 @@ const axios = require('axios');
 const moment = require('moment');
 const qs = require('qs');
 const ecpay_payment = require('ecpay_aio_nodejs');
-require('dotenv').config(); // 加载环境变量
+require('dotenv').config(); 
 
-
-// 显示订单创建表单
 router.get('/', (req, res) => {
   res.send(`
     <form action="/green/createOrder" method="POST">
@@ -27,7 +25,7 @@ router.get('/checkout', (req, res) => {
 
     const base_param = {
         MerchantTradeNo: MerchantTradeNo, //請帶20碼uid, ex: f0a0d7e9fae1bb72bc93
-        MerchantTradeDate: moment().format('YYYY/MM/DD HH:mm:ss'), //ex: 2017/02/13 15:45:30
+        MerchantTradeDate: moment().format('YYYY/MM/DD HH:mm:ss'), 
         TotalAmount: '100',
         TradeDesc: '測試交易描述',
         ItemName: '測試商品等',
@@ -85,21 +83,21 @@ router.get('/checkout', (req, res) => {
       res.render('checkout',{title: 'Express', checkoutForm: htm});
   });
 
-// 生成长度为20的UUID，基于时间戳和随机字符串
+
 function generateUUID() {
-  const timestamp = Date.now().toString().slice(-10); // 当前时间戳后10位
-  const randomString = crypto.randomBytes(5).toString('hex').slice(0, 10); // 随机字符串
+  const timestamp = Date.now().toString().slice(-10); 
+  const randomString = crypto.randomBytes(5).toString('hex').slice(0, 10); 
   return timestamp + randomString;
 }
 
-// 创建新订单
+
 router.post('/createOrder', async (req, res) => {
   const { itemName, itemPrice } = req.body;
 
-  // 生成订单号
-  const MerchantTradeNo = generateUUID();
 
-  // 订单数据
+const MerchantTradeNo = generateUUID();
+
+
   const orderData = {
     MerchantID: process.env.ECPAY_MERCHANT_ID,
     MerchantTradeNo: MerchantTradeNo,
@@ -120,7 +118,7 @@ router.post('/createOrder', async (req, res) => {
   orderData.CheckMacValue = checkMacValue;
 
   try {
-    // 发送请求到 ECPay
+    
     const response = await axios.post(process.env.ECPAY_PAYMENT_URL, qs.stringify(orderData), {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
@@ -135,7 +133,7 @@ router.post('/createOrder', async (req, res) => {
 
 // 生成 CheckMacValue
 function generateCheckValue(params) {
-  // 将 params 转换为字符串，并按键名排序
+  
   const sortedParams = Object.keys(params)
     .sort()
     .map(key => `${key}=${params[key]}`)
@@ -144,7 +142,6 @@ function generateCheckValue(params) {
   // 加入 HashKey 和 HashIV
   const raw = `HashKey=${process.env.ECPAY_HASH_KEY}&${sortedParams}&HashIV=${process.env.ECPAY_HASH_IV}`;
 
-  // URL 编码并替换字符
   const encoded = encodeURIComponent(raw)
     .toLowerCase()
     .replace(/%2d/g, '-')
@@ -156,7 +153,6 @@ function generateCheckValue(params) {
     .replace(/%29/g, ')')
     .replace(/%20/g, '+');
 
-  // 生成 SHA256 哈希值并转换为大写
   const hash = crypto.createHash('sha256').update(encoded).digest('hex').toUpperCase();
   return hash;
 }
