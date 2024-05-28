@@ -83,15 +83,9 @@ router.get('/list', async (req, res) => {
       Event.find()
         .skip(skip)
         .limit(limit)
-        //.populate('categoryId')
-        //.populate('tagId')
-        // .populate({
-        //   path: 'sessionIds',
-        //   select: 'eventId'
-        // })
-        .populate('sessionIds')
-        //.populate('sponsorId')
-        //.populate('favoriteIds')
+        .populate('categoryList')
+        .populate('sessionList')
+        .populate('tagList')
         .exec(),
       Event.countDocuments()
     ]);
