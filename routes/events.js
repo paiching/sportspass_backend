@@ -133,7 +133,6 @@ router.get('/mode/:displayMode', async (req, res) => {
       categoryId: new mongoose.Types.ObjectId(categoryId)
     };
 
-    // Initial match for categoryId
     const pipeline = [
       { $match: match },
       {
@@ -147,7 +146,6 @@ router.get('/mode/:displayMode', async (req, res) => {
       { $unwind: '$tagList' }
     ];
 
-    // Additional match for search query
     if (q) {
       pipeline.push({
         $match: {
@@ -182,6 +180,28 @@ router.get('/mode/:displayMode', async (req, res) => {
     }
 
     pipeline.push(
+      {
+        $lookup: {
+          from: 'sessions',
+          localField: 'sessionList',
+          foreignField: '_id',
+          as: 'sessions'
+        }
+      },
+      {
+        $addFields: {
+          eventPeriod: {
+            start: { $min: "$sessions.sessionTime" },
+            end: { $max: "$sessions.sessionTime" }
+          }
+        }
+      },
+      {
+        $project: {
+          sessionList: 0, // Exclude sessionList
+          sessions: 0    // Exclude sessions
+        }
+      },
       { $skip: skip },
       { $limit: limitNum },
       {
@@ -204,6 +224,10 @@ router.get('/mode/:displayMode', async (req, res) => {
     const events = await Event.aggregate(pipeline);
 
     console.log('Events found:', events.length); // Debug output to check the number of events found
+    events.forEach(event => {
+      console.log('Event Sessions:', event.sessions); // Debug output to check sessions data
+      console.log('Activity Period:', event.activityPeriod); // Debug output to check activity period
+    });
 
     res.status(200).json({
       status: 'success',
@@ -216,6 +240,7 @@ router.get('/mode/:displayMode', async (req, res) => {
     res.status(500).send("Error fetching events");
   }
 });
+
 
 
 
