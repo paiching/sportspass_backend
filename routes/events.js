@@ -33,7 +33,7 @@ router.get('/sponsor/:id', async (req, res) => {
         //   path: 'sessionIds',
         //   select: 'sessionName'
         // })
-        .populate('categoryList')
+        .populate('categoryId')
         .populate('sessionList')
         .populate('tagList')
         .exec(),
@@ -83,7 +83,7 @@ router.get('/list', async (req, res) => {
       Event.find()
         .skip(skip)
         .limit(limit)
-        .populate('categoryList')
+        .populate('categoryId')
         .populate('sessionList')
         .populate('tagList')
         .exec(),
@@ -111,61 +111,104 @@ router.get('/list', async (req, res) => {
   }
 });
 
-// GET events based on display mode
 router.get('/mode/:displayMode', async (req, res) => {
   const displayMode = req.params.displayMode;
+  const { categoryId, limit, p, q } = req.query;
+
+  // Validate required query parameters
+  if (!categoryId || !limit) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'categoryId and limit are required query parameters'
+    });
+  }
+
+  const limitNum = parseInt(limit, 10);
+  const pageNum = p ? parseInt(p, 10) : 1;
+  const skip = (pageNum - 1) * limitNum;
 
   try {
-    let query = {};
     const now = new Date();
+    const match = {
+      categoryId: new mongoose.Types.ObjectId(categoryId)
+    };
 
-    switch (displayMode) {
-      case 'all':
-        query = {}; // No filter, fetch all events
-        break;
-      case 'recent':
-        query = { eventDate: { $gte: now } }; // Events happening from now onwards
-        break;
-      case 'latestSell':
-        query = { releaseDate: { $lte: now } }; // Events that are newly released for selling
-        break;
-      case 'latest':
-        query = {}; // Assuming latest events means sorting by createdAt
-        break;
-      case 'hot':
-        query = {}; // Assuming hot events are determined by a field, e.g., popularity
-        break;
-      case 'upcoming':
-        query = { eventDate: { $gte: now, $lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) } }; // Events happening within a week
-        break;
-      case 'other':
-        query = {}; // Custom logic for other events if necessary
-        break;
-      default:
-        return res.status(400).json({
-          status: 'error',
-          message: 'Invalid display mode'
-        });
+    // Initial match for categoryId
+    const pipeline = [
+      { $match: match },
+      {
+        $lookup: {
+          from: 'tags',
+          localField: 'tagList',
+          foreignField: '_id',
+          as: 'tagList'
+        }
+      },
+      { $unwind: '$tagList' }
+    ];
+
+    // Additional match for search query
+    if (q) {
+      pipeline.push({
+        $match: {
+          $or: [
+            { eventName: { $regex: q, $options: 'i' } },
+            { eventIntro: { $regex: q, $options: 'i' } },
+            { 'tagList.name': { $regex: q, $options: 'i' } }
+          ]
+        }
+      });
     }
 
-    let events = await Event.find(query)
-      .populate('sessionList')
-      .populate('categoryList')
-      .populate('tagList')
-      .sort(displayMode === 'latest' ? { createdAt: -1 } : {});
+    switch (displayMode) {
+      case 'recent':
+        pipeline.push({ $match: { eventDate: { $gte: now } } });
+        break;
+      case 'latestSell':
+        pipeline.push({ $match: { releaseDate: { $lte: now } } });
+        break;
+      case 'latest':
+        pipeline.push({ $sort: { createdAt: -1 } });
+        break;
+      case 'hot':
+        // Add sorting/filtering logic for hot events if applicable
+        break;
+      case 'upcoming':
+        pipeline.push({ $match: { eventDate: { $gte: now, $lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) } } });
+        break;
+      case 'other':
+        // Custom logic for other events if necessary
+        break;
+    }
 
-    // Replace sessionIds with sessionList
-    const eventsWithSessionList = events.map(event => {
-      const eventObject = event.toObject();
-      eventObject.sessionList = eventObject.sessionIds;
-      delete eventObject.sessionIds;
-      return eventObject;
-    });
+    pipeline.push(
+      { $skip: skip },
+      { $limit: limitNum },
+      {
+        $lookup: {
+          from: 'categories',
+          localField: 'categoryId',
+          foreignField: '_id',
+          as: 'categoryId'
+        }
+      },
+      {
+        $addFields: {
+          categoryId: { $arrayElemAt: ['$categoryId', 0] }
+        }
+      }
+    );
+
+    console.log('Aggregation Pipeline:', JSON.stringify(pipeline)); // Debug output to check the aggregation pipeline
+
+    const events = await Event.aggregate(pipeline);
+
+    console.log('Events found:', events.length); // Debug output to check the number of events found
 
     res.status(200).json({
       status: 'success',
       data: {
-        events: eventsWithSessionList
+        events
       }
     });
   } catch (error) {
@@ -174,12 +217,16 @@ router.get('/mode/:displayMode', async (req, res) => {
   }
 });
 
+
+
+
+
 /* GET a specific event by ID, including related sessions. */
 router.get('/:id', async (req, res) => {
   try {
     const event = await Event.findById(req.params.id)
       .populate('sessionList')
-      .populate('categoryList')
+      .populate('categoryId')
       .populate('sessionList')
       .populate('tagList')
       .exec();
@@ -213,11 +260,10 @@ router.post('/', async (req, res) => {
   try {
     const {
       eventName, eventDate, eventPic,
-      coverPic, smallBanner, categoryList, tagList, releaseDate,
+      coverPic, smallBanner, categoryId, tagList, releaseDate,
       eventIntro, sponsorId, sessionList
     } = req.body;
 
-    // 将相关字段转换为 ObjectId 类型
     const newEvent = new Event({
       eventName,
       eventDate,
@@ -225,7 +271,7 @@ router.post('/', async (req, res) => {
       coverPic,
       smallBanner,
       sponsorId: new mongoose.Types.ObjectId,
-      categoryList: Array.isArray(categoryList) ? categoryList.map(id => new mongoose.Types.ObjectId) : [],
+      categoryId: new mongoose.Types.ObjectId,
       tagList: Array.isArray(tagList) ? tagList.map(id => new mongoose.Types.ObjectId) : [],
       releaseDate,
       status: 1,
