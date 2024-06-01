@@ -5,7 +5,7 @@
  */
 
 var app = require('../app');
-var debug = require('debug')('backend:server');
+var debug = require('debug')('your-project-name:server');
 var http = require('http');
 
 /**
@@ -28,6 +28,25 @@ var server = http.createServer(app);
 server.listen(port);
 server.on('error', onError);
 server.on('listening', onListening);
+
+/**
+ * Socket.IO configuration.
+ */
+const socketIo = require('socket.io');
+const io = socketIo(server);
+
+io.on('connection', (socket) => {
+  console.log('用户已连接');
+
+  socket.on('sendNotification', (data) => {
+    console.log('收到通知:', data);
+    io.emit('receiveNotification', data);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('用户已断开连接');
+  });
+});
 
 /**
  * Normalize a port into a number, string, or false.
@@ -87,4 +106,5 @@ function onListening() {
     ? 'pipe ' + addr
     : 'port ' + addr.port;
   debug('Listening on ' + bind);
+  console.log(`服务器正在运行在端口 ${bind}`);
 }
