@@ -2,7 +2,7 @@ require('dotenv').config({ path: './.env' });
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const connectDBs = require('./db');
+const connectDBs = require('./db'); 
 const cors = require('cors');
 const path = require('path');
 const cookieParser = require('cookie-parser');
@@ -75,35 +75,6 @@ app.use((err, req, res, next) => {
     status: err.status || 'error',
     message: err.message
   });
-});
-
-// 创建HTTP服务器
-const server = http.createServer(app);
-
-// 创建Socket.IO实例
-const io = socketIo(server);
-
-// 创建通知命名空间
-const notifications = io.of('/notifications');
-
-// Socket.IO逻辑，用于实时更新
-io.on('connection', (socket) => {
-  console.log('用户已连接');
-
-  socket.on('sendNotification', (data) => {
-    console.log('收到通知:', data);
-    io.emit('receiveNotification', data);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('用户已断开连接');
-  });
-});
-
-// 确保使用Render.com提供的端口
-const PORT = process.env.PORT || 3003;
-server.listen(PORT, () => {
-  console.log(`服务器正在运行在端口 ${PORT}`);
 });
 
 module.exports = app;
