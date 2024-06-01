@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Notification</title>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <h1>Admin Notification</h1>
+  <form id="notificationForm">
+    <label for="title">Title:</label>
+    <input type="text" id="title" name="title" required><br><br>
+    <label for="message">Message:</label>
+    <textarea id="message" name="message" required></textarea><br><br>
+    <button type="submit">Send Notification</button>
+  </form>
+
+  <script>
+    const socket = io();
+
+    document.getElementById('notificationForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const title = document.getElementById('title').value;
+      const message = document.getElementById('message').value;
+      const notification = {
+        id: new Date().getTime().toString(),
+        title: title,
+        message: message,
+        isRead: false
+      };
+      socket.emit('sendNotification', notification);
+    });
+  </script>
+</body>
+</html>

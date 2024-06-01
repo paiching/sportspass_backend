@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Client Notifications</title>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <h1>Client Notifications</h1>
+  <ul id="notifications"></ul>
+
+  <script>
+    const socket = io();
+
+    socket.on('receiveNotification', function (data) {
+      const notificationsList = document.getElementById('notifications');
+      const listItem = document.createElement('li');
+      listItem.textContent = `Title: ${data.title}, Message: ${data.message}, Is Read: ${data.isRead}`;
+      notificationsList.appendChild(listItem);
+    });
+  </script>
+</body>
+</html>

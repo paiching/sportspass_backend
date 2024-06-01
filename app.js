@@ -1,27 +1,26 @@
 require('dotenv').config({ path: './.env' });
-//console.log("MongoDB URI:", process.env.DATABASE_Atlas);
-
-var express = require('express');
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
 const connectDBs = require('./db'); 
-//const connectDB = require('./dbs'); 
-var cors = require('cors');
-var path = require('path');
-var cookieParser = require('cookie-parser');
-var logger = require('morgan');
+const cors = require('cors');
+const path = require('path');
+const cookieParser = require('cookie-parser');
+const logger = require('morgan');
 
-var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
-var ticketsRouter = require('./routes/tickets');
-var eventsRouter = require('./routes/events');
-var sessionsRouter = require('./routes/sessions');
-var tagsRouter = require('./routes/tags');
-var ordersRouter = require('./routes/orders');
-var greensRouter = require('./routes/green');
-var notificationsRouter = require('./routes/notifications');
-var subscriptionsRouter = require('./routes/subscriptions');
+const indexRouter = require('./routes/index');
+const usersRouter = require('./routes/users');
+const ticketsRouter = require('./routes/tickets');
+const eventsRouter = require('./routes/events');
+const sessionsRouter = require('./routes/sessions');
+const tagsRouter = require('./routes/tags');
+const ordersRouter = require('./routes/orders');
+const greensRouter = require('./routes/green');
+const notificationsRouter = require('./routes/notifications');
+const subscriptionsRouter = require('./routes/subscriptions');
 const handleError = require('./middlewares/errorHandler');
 
-var app = express();
+const app = express();
 app.use(express.json());
 
 app.use(cors());
@@ -49,9 +48,14 @@ app.use('/api/v1/order', ordersRouter);
 app.use('/order', ordersRouter);
 app.use('/green', greensRouter);
 
+// socket路由範例
+app.get('/admin', (req, res) => {
+  res.render('adminSocket');
+});
 
-//app.use('/api/v1/users/forgotpassword', usersRouter);
-//app.use('/api/v1/users/resetpassword/:token', usersRouter);
+app.get('/client', (req, res) => {
+  res.render('clientSocket');
+});
 
 // 錯誤處理中間件
 app.use((req, res, next) => {
@@ -61,16 +65,39 @@ app.use((req, res, next) => {
     });
   });
   
-  // 全局錯誤處理
-  app.use((err, req, res, next) => {
-    console.error('ERROR 💥', err);
-    res.status(err.statusCode || 500).json({
-      status: err.status || 'error',
-      message: err.message
-    });
+// 全局錯誤處理
+app.use((err, req, res, next) => {
+  console.error('ERROR 💥', err);
+  res.status(err.statusCode || 500).json({
+    status: err.status || 'error',
+    message: err.message
+  });
+});
+
+
+const server = http.createServer(app);
+const io = socketIo(server);
+
+const notifications = io.of('/notifications');
+
+// Socket.IO
+io.on('connection', (socket) => {
+  console.log('用户已連接');
+
+  socket.on('sendNotification', (data) => {
+    console.log('收到通知:', data);
+    io.emit('receiveNotification', data);
   });
 
-// 在所有路由之後加入錯誤處理middleware
-//app.use(handleError);
+  socket.on('disconnect', () => {
+    console.log('用户已斷開連接');
+  });
+});
+
+
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, () => {
+  console.log(`服务器正在运行在端口 ${PORT}`);
+});
 
 module.exports = app;
