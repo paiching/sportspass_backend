@@ -23,7 +23,13 @@ const handleError = require('./middlewares/errorHandler');
 const app = express();
 app.use(express.json());
 
-app.use(cors());
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'development' ? process.env.DEV_FRONTEND_URL : process.env.PROD_FRONTEND_URL,
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
