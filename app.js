@@ -18,6 +18,7 @@ const ordersRouter = require('./routes/orders');
 const greensRouter = require('./routes/green');
 const notificationsRouter = require('./routes/notifications');
 const subscriptionsRouter = require('./routes/subscriptions');
+const categoriesRouter = require('./routes/categories');
 const handleError = require('./middlewares/errorHandler');
 
 const app = express();
@@ -56,6 +57,7 @@ app.use('/api/v1/subscription', subscriptionsRouter);
 app.use('/api/v1/order', ordersRouter);
 app.use('/order', ordersRouter);
 app.use('/green', greensRouter);
+app.use('/api/v1/categories', categoriesRouter);
 
 // socket路由範例
 app.get('/admin', (req, res) => {

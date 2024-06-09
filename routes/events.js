@@ -2,12 +2,12 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const { Types } = mongoose;
-const Event = require('../models/eventsModel');
+const { Event } = require('../models/eventsModel');
 const Order = require('../models/ordersModel');
-const Session = require('../models/sessionsModel');
+const { Session} = require('../models/sessionsModel');
 const Category = require('../models/categoryModel');
 const User = require('../models/usersModel');
-
+const Tag = require('../models/tagsModel'); // 確保正確引入標籤模型
 
 // GET events listing with pagination based on sponsorId
 router.get('/sponsor/:id', async (req, res) => {
@@ -280,43 +280,117 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-/* POST create a new event. */
+// POST create a new event with sessions.
 router.post('/', async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const {
-      eventName, eventDate, eventPic,
-      coverPic, smallBanner, categoryId, tagList, releaseDate,
-      eventIntro, sponsorId, sessionList
+      eventSetting: {
+        eventName, eventDate, eventPic, coverPic, smallBanner,
+        categorysNameTC, tags, releaseDate, eventIntro
+      },
+      sessionSetting
     } = req.body;
 
+    // Validate category ID
+    const category = await Category.findOne({ nameTC: categorysNameTC }).session(session);
+    if (!category) {
+      throw new Error('無效的類別名稱');
+    }
+
+    // Validate and convert tag IDs, and update eventNum
+    const tagIds = [];
+    for (const tagName of tags) {
+      const tag = await Tag.findOne({ name: tagName }).session(session);
+      if (!tag) {
+        throw new Error(`無效的標籤名稱: ${tagName}`);
+      }
+      tag.eventNum += 1; // 更新 eventNum
+      await tag.save({ session });
+      tagIds.push(tag._id);
+    }
+
+    // Create the event with a temporary session list
     const newEvent = new Event({
       eventName,
       eventDate,
       eventPic,
       coverPic,
       smallBanner,
-      sponsorId: new mongoose.Types.ObjectId,
-      categoryId: new mongoose.Types.ObjectId,
-      tagList: Array.isArray(tagList) ? tagList.map(id => new mongoose.Types.ObjectId) : [],
+      categoryId: category._id,
+      tagList: tagIds,
       releaseDate,
-      status: 1,
       eventIntro,
-      sessionList: Array.isArray(sessionList) ? sessionList.map(id => new mongoose.Types.ObjectId) : [],
+      sessionList: [], // 暫時設為空
+      status: 1,
       createdAt: new Date(),
       updatedAt: new Date()
     });
 
-    await newEvent.save();
+    const savedEvent = await newEvent.save({ session });
+
+    // Create sessions and get their IDs
+    const sessionIds = [];
+    for (const sessionData of sessionSetting) {
+      const newSession = new Session({
+        eventId: savedEvent._id, // 現在設置 eventId
+        sessionName: sessionData.sessionName,
+        sessionTime: sessionData.sessionTime,
+        sessionPlace: sessionData.sessionPlace,
+        sessionSalesPeriod: sessionData.sessionSalesPeriod,
+        areaSetting: sessionData.areaSetting.map(area => ({
+          areaVenuePic: area.areaVenuePic,
+          areaColor: area.areaColor,
+          areaName: area.areaName,
+          areaPrice: area.areaPrice,
+          areaTicketType: area.areaTicketType.map(ticket => ({
+            ticketName: ticket.ticketName,
+            ticketDiscount: ticket.ticketDiscount,
+            areaNumber: ticket.areaNumber
+          }))
+        }))
+      });
+      const savedSession = await newSession.save({ session });
+      sessionIds.push(savedSession._id);
+    }
+
+    // 更新 event 的 sessionList
+    savedEvent.sessionList = sessionIds;
+    await savedEvent.save({ session });
+
+    // 更新 category 的 eventNum
+    category.eventNum += 1;
+    await category.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
 
     res.status(201).json({
       status: 'success',
       data: {
-        event: newEvent
+        event: savedEvent
       }
     });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
     console.error("Error creating event", error);
-    res.status(500).send("Error creating event");
+
+    let errorMessage;
+    if (error.message.includes('無效的')) {
+      errorMessage = error.message;
+    } else {
+      errorMessage = '創建事件時發生錯誤: ' + error.message;
+    }
+
+    res.status(400).json({
+      status: 'error',
+      message: errorMessage,
+      details: error.stack
+    });
   }
 });
 

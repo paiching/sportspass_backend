@@ -8,14 +8,11 @@ const eventSchema = new Schema({
     coverPic: { type: String, required: true },
     smallBanner: { type: String, required: true },
     categoryId: { type: Schema.Types.ObjectId, ref: 'Category' },
-    //categoryList: [{ type: Schema.Types.ObjectId, ref: 'Category' }],
-    //tagId: [{ type: Schema.Types.ObjectId, ref: 'Tag' }],
     sponsorId: { type: Schema.Types.ObjectId, ref: 'User' },
     tagList: [{ type: Schema.Types.ObjectId, ref: 'Tag' }],
     releaseDate: { type: Date, required: true },
     eventIntro: { type: String, required: true },
-    status: {type: Number},
-    //sessionIds: [{ type: mongoose.Schema.ObjectId, ref: 'Session' }],
+    status: { type: Number },
     sessionList: [{ type: mongoose.Schema.ObjectId, ref: 'Session' }],
     createdAt: { type: Date, default: Date.now, required: true },
     updatedAt: { type: Date, default: Date.now, required: true }
@@ -23,4 +20,4 @@ const eventSchema = new Schema({
 
 const Event = mongoose.model('Event', eventSchema);
 
-module.exports = Event;
+module.exports = { Event };
