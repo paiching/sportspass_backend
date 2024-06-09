@@ -20,6 +20,7 @@ const notificationsRouter = require('./routes/notifications');
 const subscriptionsRouter = require('./routes/subscriptions');
 const categoriesRouter = require('./routes/categories');
 const handleError = require('./middlewares/errorHandler');
+const uploadRouter = require('./routes/upload');
 
 const app = express();
 app.use(express.json());
@@ -62,6 +63,11 @@ app.use('/api/v1/order', ordersRouter);
 app.use('/order', ordersRouter);
 app.use('/green', greensRouter);
 app.use('/api/v1/categories', categoriesRouter);
+app.use('/upload', uploadRouter);
+
+app.get('/upload/images', (req, res) => {
+  res.render('uploadImage');
+});
 
 // socket路由範例
 app.get('/admin', (req, res) => {
