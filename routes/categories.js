@@ -9,12 +9,26 @@ router.post('/', async (req, res) => {
     const { nameTC, nameEN, photo } = req.body;
 
     // 檢查是否已存在相同名稱的類別
-    const existingCategory = await Category.findOne({ nameTC, isDeleted: false });
+    const existingCategory = await Category.findOne({ nameTC });
     if (existingCategory) {
-      return res.status(400).json({
-        status: 'error',
-        message: '類別名稱已存在'
-      });
+      if (existingCategory.isDeleted) {
+        // 如果類別存在但已刪除，更新為未刪除
+        existingCategory.isDeleted = false;
+        existingCategory.nameEN = nameEN;
+        existingCategory.photo = photo;
+        await existingCategory.save();
+        return res.status(200).json({
+          status: 'success',
+          data: {
+            category: existingCategory
+          }
+        });
+      } else {
+        return res.status(400).json({
+          status: 'error',
+          message: '類別名稱已存在'
+        });
+      }
     }
 
     const newCategory = new Category({ nameTC, nameEN, photo });
