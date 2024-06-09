@@ -9,7 +9,7 @@ router.post('/', async (req, res) => {
     const { nameTC, nameEN, photo } = req.body;
 
     // 檢查是否已存在相同名稱的類別
-    const existingCategory = await Category.findOne({ nameTC });
+    const existingCategory = await Category.findOne({ nameTC, isDeleted: false });
     if (existingCategory) {
       return res.status(400).json({
         status: 'error',
@@ -35,11 +35,31 @@ router.post('/', async (req, res) => {
   }
 });
 
+// READ all categories
+router.get('/', async (req, res) => {
+  try {
+    const categories = await Category.find({ isDeleted: false });
+    res.status(200).json({
+      status: 'success',
+      data: {
+        categories
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching categories", error);
+    res.status(400).json({
+      status: 'error',
+      message: '獲取類別時發生錯誤: ' + error.message,
+      details: error.stack
+    });
+  }
+});
+
 // READ all categories with limit
 router.get('/all', async (req, res) => {
   try {
     const { limit = 10 } = req.query; // 預設返回10個類別
-    const categories = await Category.find().limit(parseInt(limit));
+    const categories = await Category.find({ isDeleted: false }).limit(parseInt(limit));
     res.status(200).json({
       status: 'success',
       data: {
@@ -60,7 +80,7 @@ router.get('/all', async (req, res) => {
 router.get('/hot', async (req, res) => {
   try {
     const { limit = 10 } = req.query; // 預設返回10個類別
-    const categories = await Category.find().sort({ eventNum: -1 }).limit(parseInt(limit));
+    const categories = await Category.find({ isDeleted: false }).sort({ eventNum: -1 }).limit(parseInt(limit));
     res.status(200).json({
       status: 'success',
       data: {
@@ -83,7 +103,7 @@ router.patch('/:id', async (req, res) => {
     const { nameTC, nameEN, photo } = req.body;
 
     // 檢查是否已存在相同名稱的類別（但忽略自身）
-    const existingCategory = await Category.findOne({ nameTC, _id: { $ne: req.params.id } });
+    const existingCategory = await Category.findOne({ nameTC, _id: { $ne: req.params.id }, isDeleted: false });
     if (existingCategory) {
       return res.status(400).json({
         status: 'error',
@@ -114,20 +134,32 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-// DELETE a category by ID
+// DELETE a category by ID (soft delete)
 router.delete('/:id', async (req, res) => {
   try {
-    const deletedCategory = await Category.findByIdAndDelete(req.params.id);
-    if (!deletedCategory) {
+    const category = await Category.findById(req.params.id);
+
+    if (!category) {
       return res.status(404).json({
         status: 'error',
         message: '類別未找到'
       });
     }
+
+    if (category.eventNum > 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: '類別無法刪除，因為其關聯的事件數量大於 0'
+      });
+    }
+
+    category.isDeleted = true;
+    await category.save();
+
     res.status(200).json({
       status: 'success',
       data: {
-        category: deletedCategory
+        category
       }
     });
   } catch (error) {
