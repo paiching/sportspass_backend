@@ -1,22 +1,41 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const Tag = require('../models/tagsModel');
+const Tag = require('../models/tagsModel'); // 確保正確引入標籤模型
 
 // CREATE a new tag
 router.post('/', async (req, res) => {
   try {
-    const { name, type, eventNum } = req.body;
-    const newTag = new Tag({
-      name,
-      type,
-      eventNum: eventNum || 0 // Default to 0 if not provided
-    });
-    await newTag.save();
+    const { name, eventNum } = req.body;
+
+    // 檢查是否已存在相同名稱的標籤
+    const existingTag = await Tag.findOne({ name });
+    if (existingTag) {
+      if (existingTag.isDeleted) {
+        // 如果標籤存在但已刪除，更新為未刪除
+        existingTag.isDeleted = false;
+        existingTag.eventNum = eventNum || existingTag.eventNum;
+        await existingTag.save();
+        return res.status(200).json({
+          status: 'success',
+          data: {
+            tag: existingTag
+          }
+        });
+      } else {
+        return res.status(400).json({
+          status: 'error',
+          message: '標籤名稱已存在'
+        });
+      }
+    }
+
+    const newTag = new Tag({ name, eventNum: eventNum || 0 });
+    const savedTag = await newTag.save();
     res.status(201).json({
       status: 'success',
       data: {
-        tag: newTag
+        tag: savedTag
       }
     });
   } catch (error) {
@@ -25,48 +44,39 @@ router.post('/', async (req, res) => {
   }
 });
 
-// READ all tags with optional type filter, search query, and limit
-router.get('/:type?', async (req, res) => {
+// READ all tags with optional search query and limit
+router.get('/all', async (req, res) => {
   try {
-    const { type } = req.params;
-    const { q, limit } = req.query;
-    let query = {};
-
-    // Handle type parameter
-    if (type && type !== 'all') {
-      query.type = type;
-    }
+    const { q, limit = 10 } = req.query; // 預設返回10個標籤
+    let query = { isDeleted: false };
 
     // Handle search query
     if (q) {
       query.name = new RegExp(q, 'i'); // Using a regex for case-insensitive partial matches
     }
 
-    // Fetch tags from the database
-    let tagsQuery = Tag.find(query);
-
-    // Handle limit parameter
-    if (limit) {
-      tagsQuery = tagsQuery.limit(parseInt(limit));
-    }
-
-    const tags = await tagsQuery;
-
-    // Add pagination details (assuming limit-based pagination)
-    const totalItems = await Tag.countDocuments(query);
-    const totalPages = limit ? Math.ceil(totalItems / limit) : 1;
-    const currentPage = 1; // This example does not include page parameter, adjust as necessary
-
+    const tags = await Tag.find(query).limit(parseInt(limit));
     res.status(200).json({
       status: 'success',
       data: {
         tags
-      },
-      pagination: {
-        totalItems,
-        totalPages,
-        currentPage,
-        pageSize: tags.length
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching tags', error);
+    res.status(500).send('Error fetching tags');
+  }
+});
+
+// READ hot tags by eventNum with limit
+router.get('/hot', async (req, res) => {
+  try {
+    const { limit = 10 } = req.query; // 預設返回10個標籤
+    const tags = await Tag.find({ isDeleted: false }).sort({ eventNum: -1 }).limit(parseInt(limit));
+    res.status(200).json({
+      status: 'success',
+      data: {
+        tags
       }
     });
   } catch (error) {
@@ -79,10 +89,10 @@ router.get('/:type?', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const tag = await Tag.findById(req.params.id);
-    if (!tag) {
+    if (!tag || tag.isDeleted) {
       return res.status(404).json({
         status: 'error',
-        message: 'Tag not found'
+        message: '標籤未找到'
       });
     }
     res.status(200).json({
@@ -100,17 +110,23 @@ router.get('/:id', async (req, res) => {
 // UPDATE a specific tag by ID
 router.patch('/:id', async (req, res) => {
   try {
-    const { name, type, eventNum } = req.body;
-    const updateData = {
-      name,
-      type,
-      eventNum
-    };
+    const { name, eventNum } = req.body;
+
+    // 檢查是否已存在相同名稱的標籤（但忽略自身）
+    const existingTag = await Tag.findOne({ name, _id: { $ne: req.params.id }, isDeleted: false });
+    if (existingTag) {
+      return res.status(400).json({
+        status: 'error',
+        message: '標籤名稱已存在'
+      });
+    }
+
+    const updateData = { name, eventNum };
     const tag = await Tag.findByIdAndUpdate(req.params.id, updateData, { new: true });
-    if (!tag) {
+    if (!tag || tag.isDeleted) {
       return res.status(404).json({
         status: 'error',
-        message: 'Tag not found'
+        message: '標籤未找到'
       });
     }
     res.status(200).json({
@@ -125,17 +141,27 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-// DELETE a specific tag by ID
+// DELETE a specific tag by ID (soft delete)
 router.delete('/:id', async (req, res) => {
   try {
-    const tag = await Tag.findByIdAndDelete(req.params.id);
+    const tag = await Tag.findById(req.params.id);
+
     if (!tag) {
       return res.status(404).json({
         status: 'error',
-        message: 'Tag not found'
+        message: '標籤未找到'
       });
     }
-    res.status(204).send();
+
+    tag.isDeleted = true;
+    await tag.save();
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        tag
+      }
+    });
   } catch (error) {
     console.error('Error deleting tag', error);
     res.status(500).send('Error deleting tag');
