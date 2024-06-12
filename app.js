@@ -63,7 +63,7 @@ app.use('/api/v1/order', ordersRouter);
 app.use('/order', ordersRouter);
 app.use('/green', greensRouter);
 app.use('/api/v1/categories', categoriesRouter);
-app.use('/upload', uploadRouter);
+app.use('/api/v1/upload', uploadRouter);
 
 app.get('/upload/images', (req, res) => {
   res.render('uploadImage');

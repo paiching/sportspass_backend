@@ -9,6 +9,12 @@ const Category = require('../models/categoryModel');
 const User = require('../models/usersModel');
 const Tag = require('../models/tagsModel'); // 確保正確引入標籤模型
 
+function getUserIdFromToken(req) {
+  const token = req.headers.authorization.split(' ')[1];
+  const decodedToken = jwt.verify(token, 'your_jwt_secret'); // 使用您的JWT秘密密鑰
+  return decodedToken.userId; // 確保token中有userId字段
+}
+
 // GET events listing with pagination based on sponsorId
 router.get('/sponsor/:id', async (req, res) => {
 
@@ -83,9 +89,9 @@ router.get('/list', async (req, res) => {
       Event.find()
         .skip(skip)
         .limit(limit)
-        .populate('categoryId')
-        .populate('sessionList')
-        .populate('tagList')
+        //.populate('categoryId')
+        //.populate('sessionList')
+        //.populate('tagList')
         .exec(),
       Event.countDocuments()
     ]);
@@ -111,17 +117,18 @@ router.get('/list', async (req, res) => {
   }
 });
 
-router.get('/mode/:displayMode', async (req, res) => {
+router.get('/:displayMode', async (req, res) => {
   const displayMode = req.params.displayMode;
   const { categoryId, limit, p, q } = req.query;
 
+  console.log("model api");
   // Validate required query parameters
-  if (!categoryId || !limit) {
-    return res.status(400).json({
-      status: 'error',
-      message: 'categoryId and limit are required query parameters'
-    });
-  }
+  // if (!categoryId || !limit) {
+  //   return res.status(400).json({
+  //     status: 'error',
+  //     message: 'categoryId and limit are required query parameters'
+  //   });
+  // }
 
   const limitNum = parseInt(limit, 10);
   const pageNum = p ? parseInt(p, 10) : 1;
@@ -294,6 +301,10 @@ router.post('/', async (req, res) => {
       sessionSetting
     } = req.body;
 
+    // 從JWT token中提取用戶ID
+    const sponsorId = getUserIdFromToken(req);
+    console.log(sponsorId);
+
     // Validate category ID
     const category = await Category.findOne({ nameTC: categorysNameTC }).session(session);
     if (!category) {
@@ -322,6 +333,7 @@ router.post('/', async (req, res) => {
       categoryId: category._id,
       tagList: tagIds,
       releaseDate,
+      sponsorId,
       eventIntro,
       sessionList: [], // 暫時設為空
       status: 1,

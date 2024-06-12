@@ -52,7 +52,7 @@ router.get('/all', async (req, res) => {
 
     // Handle search query
     if (q) {
-      query.name = new RegExp(q, 'i'); // Using a regex for case-insensitive partial matches
+      query.name = new RegExp(q, 'i'); // 使用正則表達式進行不區分大小寫的部分匹配
     }
 
     const tags = await Tag.find(query).limit(parseInt(limit));
@@ -68,11 +68,18 @@ router.get('/all', async (req, res) => {
   }
 });
 
-// READ hot tags by eventNum with limit
+// READ hot tags by eventNum with optional search query and limit
 router.get('/hot', async (req, res) => {
   try {
-    const { limit = 10 } = req.query; // 預設返回10個標籤
-    const tags = await Tag.find({ isDeleted: false }).sort({ eventNum: -1 }).limit(parseInt(limit));
+    const { q, limit = 10 } = req.query; // 預設返回10個標籤
+    let query = { isDeleted: false };
+
+    // Handle search query
+    if (q) {
+      query.name = new RegExp(q, 'i'); // 使用正則表達式進行不區分大小寫的部分匹配
+    }
+
+    const tags = await Tag.find(query).sort({ eventNum: -1 }).limit(parseInt(limit));
     res.status(200).json({
       status: 'success',
       data: {
@@ -84,6 +91,7 @@ router.get('/hot', async (req, res) => {
     res.status(500).send('Error fetching tags');
   }
 });
+
 
 // READ a specific tag by ID
 router.get('/:id', async (req, res) => {
