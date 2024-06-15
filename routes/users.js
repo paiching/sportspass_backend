@@ -35,14 +35,14 @@ const { generateSendJWT } = require('../utils/jwt');
 router.get('/list', verifyToken, async (req, res) => {
   try {
     const users = await User.find({}, { password: 0 })
-    .populate({
-      path: 'subscribes',
-      model: Subscription 
-    })
-    .populate({
-      path: 'focusedEvents',
-      model: Event 
-    });
+    // .populate({
+    //   path: 'subscribes',
+    //   model: Subscription 
+    // })
+    // .populate({
+    //   path: 'focusedEvents',
+    //   model: Event 
+    // });
 
     res.status(200).json({
       status: 'success',
@@ -61,14 +61,14 @@ router.get('/profile/:id', verifyToken, async (req, res, next) => {
 
   try {
     const user = await User.findById(userId, '-password')
-      .populate({
-        path: 'subscribes',
-        model: Subscription // or 'Subscription' if you prefer
-      })
-      .populate({
-        path: 'focusedEvents',
-        model: Event 
-      });
+      // .populate({
+      //   path: 'subscribes',
+      //   model: Subscription // or 'Subscription' if you prefer
+      // })
+      // .populate({
+      //   path: 'focusedEvents',
+      //   model: Event 
+      // });
 
     if (!user) {
       return res.status(404).json({
