@@ -75,6 +75,7 @@ router.post('/', verifyToken, async (req, res) => {
 
     // Create sessions and get their IDs
     const sessionIds = [];
+    const sessionSettingWithIds = [];
     for (const sessionData of sessionSetting) {
       const newSession = new Session({
         eventId: savedEvent._id, // 現在設置 eventId
@@ -96,6 +97,16 @@ router.post('/', verifyToken, async (req, res) => {
       });
       const savedSession = await newSession.save({ session });
       sessionIds.push(savedSession._id);
+
+      // 構造 sessionSettingWithIds 以便返回完整的 sessionSetting 資料
+      sessionSettingWithIds.push({
+        sessionId: savedSession._id,
+        sessionName: savedSession.sessionName,
+        sessionTime: savedSession.sessionTime,
+        sessionPlace: savedSession.sessionPlace,
+        sessionSalesPeriod: savedSession.sessionSalesPeriod,
+        areaSetting: savedSession.areaSetting
+      });
     }
 
     // 更新 event 的 sessionList
@@ -114,10 +125,14 @@ router.post('/', verifyToken, async (req, res) => {
       .populate('categoryId', 'nameTC')
       .populate('tagList', 'name');
 
+    // 返回的資料包含 sessionSetting 而不是 sessionList
     res.status(201).json({
       status: 'success',
       data: {
-        event: populatedEvent
+        event: {
+          ...populatedEvent._doc, // 使用 ._doc 來獲取 Mongoose 文檔的原始對象
+          sessionSetting: sessionSettingWithIds
+        }
       }
     });
   } catch (error) {
