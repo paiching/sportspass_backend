@@ -8,12 +8,138 @@ const { Session} = require('../models/sessionsModel');
 const Category = require('../models/categoryModel');
 const User = require('../models/usersModel');
 const Tag = require('../models/tagsModel'); // 確保正確引入標籤模型
+const jwt = require('jsonwebtoken');
+const verifyToken = require('../middlewares/verifyToken');
 
-function getUserIdFromToken(req) {
+// 提取 userID 的函數
+const getUserIdFromToken = (req) => {
   const token = req.headers.authorization.split(' ')[1];
-  const decodedToken = jwt.verify(token, 'your_jwt_secret'); // 使用您的JWT秘密密鑰
-  return decodedToken.userId; // 確保token中有userId字段
-}
+  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  return decoded.id;
+};
+
+router.post('/', verifyToken, async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const {
+      eventSetting: {
+        eventName, eventDate, eventPic, coverPic, smallBanner,
+        categorysNameTC, tags, releaseDate, eventIntro
+      },
+      sessionSetting
+    } = req.body;
+
+    // 從JWT token中提取用戶ID
+    const sponsorId = getUserIdFromToken(req);
+    console.log(sponsorId);
+
+    // Validate category ID
+    const category = await Category.findOne({ nameTC: categorysNameTC }).session(session);
+    if (!category) {
+      throw new Error('無效的類別名稱');
+    }
+
+    // Validate and convert tag IDs, and update eventNum
+    const tagIds = [];
+    for (const tagName of tags) {
+      const tag = await Tag.findOne({ name: tagName }).session(session);
+      if (!tag) {
+        throw new Error(`無效的標籤名稱: ${tagName}`);
+      }
+      tag.eventNum += 1; // 更新 eventNum
+      await tag.save({ session });
+      tagIds.push(tag._id);
+    }
+
+    // Create the event with a temporary session list
+    const newEvent = new Event({
+      eventName,
+      eventDate,
+      eventPic,
+      coverPic,
+      smallBanner,
+      categoryId: category._id,
+      tagList: tagIds,
+      releaseDate,
+      sponsorId,
+      eventIntro,
+      sessionList: [], // 暫時設為空
+      status: 1,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    const savedEvent = await newEvent.save({ session });
+
+    // Create sessions and get their IDs
+    const sessionIds = [];
+    for (const sessionData of sessionSetting) {
+      const newSession = new Session({
+        eventId: savedEvent._id, // 現在設置 eventId
+        sessionName: sessionData.sessionName,
+        sessionTime: sessionData.sessionTime,
+        sessionPlace: sessionData.sessionPlace,
+        sessionSalesPeriod: sessionData.sessionSalesPeriod,
+        areaSetting: sessionData.areaSetting.map(area => ({
+          areaVenuePic: area.areaVenuePic,
+          areaColor: area.areaColor,
+          areaName: area.areaName,
+          areaPrice: area.areaPrice,
+          areaTicketType: area.areaTicketType.map(ticket => ({
+            ticketName: ticket.ticketName,
+            ticketDiscount: ticket.ticketDiscount,
+            areaNumber: ticket.areaNumber
+          }))
+        }))
+      });
+      const savedSession = await newSession.save({ session });
+      sessionIds.push(savedSession._id);
+    }
+
+    // 更新 event 的 sessionList
+    savedEvent.sessionList = sessionIds;
+    await savedEvent.save({ session });
+
+    // 更新 category 的 eventNum
+    category.eventNum += 1;
+    await category.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Populate category and tags
+    const populatedEvent = await Event.findById(savedEvent._id)
+      .populate('categoryId', 'nameTC')
+      .populate('tagList', 'name');
+
+    res.status(201).json({
+      status: 'success',
+      data: {
+        event: populatedEvent
+      }
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
+    console.error("Error creating event", error);
+
+    let errorMessage;
+    if (error.message.includes('無效的')) {
+      errorMessage = error.message;
+    } else {
+      errorMessage = '創建事件時發生錯誤: ' + error.message;
+    }
+
+    res.status(400).json({
+      status: 'error',
+      message: errorMessage,
+      details: error.stack
+    });
+  }
+});
 
 // GET events listing with pagination based on sponsorId
 router.get('/sponsor/:id', async (req, res) => {
@@ -287,124 +413,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST create a new event with sessions.
-router.post('/', async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
 
-  try {
-    const {
-      eventSetting: {
-        eventName, eventDate, eventPic, coverPic, smallBanner,
-        categorysNameTC, tags, releaseDate, eventIntro
-      },
-      sessionSetting
-    } = req.body;
-
-    // 從JWT token中提取用戶ID
-    const sponsorId = getUserIdFromToken(req);
-    console.log(sponsorId);
-
-    // Validate category ID
-    const category = await Category.findOne({ nameTC: categorysNameTC }).session(session);
-    if (!category) {
-      throw new Error('無效的類別名稱');
-    }
-
-    // Validate and convert tag IDs, and update eventNum
-    const tagIds = [];
-    for (const tagName of tags) {
-      const tag = await Tag.findOne({ name: tagName }).session(session);
-      if (!tag) {
-        throw new Error(`無效的標籤名稱: ${tagName}`);
-      }
-      tag.eventNum += 1; // 更新 eventNum
-      await tag.save({ session });
-      tagIds.push(tag._id);
-    }
-
-    // Create the event with a temporary session list
-    const newEvent = new Event({
-      eventName,
-      eventDate,
-      eventPic,
-      coverPic,
-      smallBanner,
-      categoryId: category._id,
-      tagList: tagIds,
-      releaseDate,
-      sponsorId,
-      eventIntro,
-      sessionList: [], // 暫時設為空
-      status: 1,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
-
-    const savedEvent = await newEvent.save({ session });
-
-    // Create sessions and get their IDs
-    const sessionIds = [];
-    for (const sessionData of sessionSetting) {
-      const newSession = new Session({
-        eventId: savedEvent._id, // 現在設置 eventId
-        sessionName: sessionData.sessionName,
-        sessionTime: sessionData.sessionTime,
-        sessionPlace: sessionData.sessionPlace,
-        sessionSalesPeriod: sessionData.sessionSalesPeriod,
-        areaSetting: sessionData.areaSetting.map(area => ({
-          areaVenuePic: area.areaVenuePic,
-          areaColor: area.areaColor,
-          areaName: area.areaName,
-          areaPrice: area.areaPrice,
-          areaTicketType: area.areaTicketType.map(ticket => ({
-            ticketName: ticket.ticketName,
-            ticketDiscount: ticket.ticketDiscount,
-            areaNumber: ticket.areaNumber
-          }))
-        }))
-      });
-      const savedSession = await newSession.save({ session });
-      sessionIds.push(savedSession._id);
-    }
-
-    // 更新 event 的 sessionList
-    savedEvent.sessionList = sessionIds;
-    await savedEvent.save({ session });
-
-    // 更新 category 的 eventNum
-    category.eventNum += 1;
-    await category.save({ session });
-
-    await session.commitTransaction();
-    session.endSession();
-
-    res.status(201).json({
-      status: 'success',
-      data: {
-        event: savedEvent
-      }
-    });
-  } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-
-    console.error("Error creating event", error);
-
-    let errorMessage;
-    if (error.message.includes('無效的')) {
-      errorMessage = error.message;
-    } else {
-      errorMessage = '創建事件時發生錯誤: ' + error.message;
-    }
-
-    res.status(400).json({
-      status: 'error',
-      message: errorMessage,
-      details: error.stack
-    });
-  }
-});
 
 /* PUT update a specific event by ID. */
 router.patch('/:id', async (req, res) => {

@@ -11,6 +11,7 @@ const verifyToken = (req, res, next) => {
       }
 
       req.user = decoded; // This line attaches the decoded token to the request
+      req.userId = decoded.id; // 將userID附加到請求對象上
       next();
     });
   } else {

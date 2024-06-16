@@ -14,23 +14,6 @@ const verifyToken = require('../middlewares/verifyToken');
 const sendEmail = require('../utils/sendEmail');
 const { generateSendJWT } = require('../utils/jwt');
 
-/* JWT */
-// const generateSendJWT = (user, statusCode, res) => {
-//   const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-//       expiresIn: process.env.JWT_EXPIRES_DAY
-//   });
-
-//   user.password = undefined; // Hide the password field
-
-//   res.status(statusCode).json({
-//       status: 'success',
-//       token,
-//       data: {
-//           user
-//       }
-//   });
-// };
-
 /* GET users listing. */
 router.get('/list', verifyToken, async (req, res) => {
   try {
