@@ -14,6 +14,8 @@ const verifyToken = require('../middlewares/verifyToken');
 const sendEmail = require('../utils/sendEmail');
 const { generateSendJWT } = require('../utils/jwt');
 
+
+
 /* GET users listing. */
 router.get('/list', verifyToken, async (req, res) => {
   try {
@@ -44,14 +46,11 @@ router.get('/profile/:id', verifyToken, async (req, res, next) => {
 
   try {
     const user = await User.findById(userId, '-password')
-      // .populate({
-      //   path: 'subscribes',
-      //   model: Subscription // or 'Subscription' if you prefer
-      // })
-      // .populate({
-      //   path: 'focusedEvents',
-      //   model: Event 
-      // });
+      .populate({
+        path: 'subscribes',
+        model: Subscription // or 'Subscription' if you prefer
+      })
+      .populate('focusedEvents');
 
     if (!user) {
       return res.status(404).json({

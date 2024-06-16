@@ -33,7 +33,6 @@ router.post('/', verifyToken, async (req, res) => {
 
     // 從JWT token中提取用戶ID
     const sponsorId = getUserIdFromToken(req);
-    console.log(sponsorId);
 
     // Validate category ID
     const category = await Category.findOne({ nameTC: categorysNameTC }).session(session);
@@ -53,7 +52,7 @@ router.post('/', verifyToken, async (req, res) => {
       tagIds.push(tag._id);
     }
 
-    // Create the event with a temporary session list
+    // Create the event with sessionSetting array
     const newEvent = new Event({
       eventName,
       eventDate,
@@ -65,7 +64,7 @@ router.post('/', verifyToken, async (req, res) => {
       releaseDate,
       sponsorId,
       eventIntro,
-      sessionList: [], // 暫時設為空
+      sessionSetting: [], // 暫時設為空
       status: 1,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -73,45 +72,25 @@ router.post('/', verifyToken, async (req, res) => {
 
     const savedEvent = await newEvent.save({ session });
 
-    // Create sessions and get their IDs
-    const sessionIds = [];
-    const sessionSettingWithIds = [];
+    // Create sessions and update sessionSetting with ids
     for (const sessionData of sessionSetting) {
       const newSession = new Session({
-        eventId: savedEvent._id, // 現在設置 eventId
+        eventId: savedEvent._id,
         sessionName: sessionData.sessionName,
         sessionTime: sessionData.sessionTime,
         sessionPlace: sessionData.sessionPlace,
         sessionSalesPeriod: sessionData.sessionSalesPeriod,
-        areaSetting: sessionData.areaSetting.map(area => ({
-          areaVenuePic: area.areaVenuePic,
-          areaColor: area.areaColor,
-          areaName: area.areaName,
-          areaPrice: area.areaPrice,
-          areaTicketType: area.areaTicketType.map(ticket => ({
-            ticketName: ticket.ticketName,
-            ticketDiscount: ticket.ticketDiscount,
-            areaNumber: ticket.areaNumber
-          }))
-        }))
+        areaSetting: sessionData.areaSetting
       });
       const savedSession = await newSession.save({ session });
-      sessionIds.push(savedSession._id);
 
-      // 構造 sessionSettingWithIds 以便返回完整的 sessionSetting 資料
-      sessionSettingWithIds.push({
-        sessionId: savedSession._id,
-        sessionName: savedSession.sessionName,
-        sessionTime: savedSession.sessionTime,
-        sessionPlace: savedSession.sessionPlace,
-        sessionSalesPeriod: savedSession.sessionSalesPeriod,
-        areaSetting: savedSession.areaSetting
-      });
+      // Add session id to sessionSetting
+      sessionData.id = savedSession._id;
+      newEvent.sessionSetting.push(sessionData);
     }
 
-    // 更新 event 的 sessionList
-    savedEvent.sessionList = sessionIds;
-    await savedEvent.save({ session });
+    // Save updated event with sessionSetting
+    await newEvent.save({ session });
 
     // 更新 category 的 eventNum
     category.eventNum += 1;
@@ -125,14 +104,10 @@ router.post('/', verifyToken, async (req, res) => {
       .populate('categoryId', 'nameTC')
       .populate('tagList', 'name');
 
-    // 返回的資料包含 sessionSetting 而不是 sessionList
     res.status(201).json({
       status: 'success',
       data: {
-        event: {
-          ...populatedEvent._doc, // 使用 ._doc 來獲取 Mongoose 文檔的原始對象
-          sessionSetting: sessionSettingWithIds
-        }
+        event: populatedEvent
       }
     });
   } catch (error) {

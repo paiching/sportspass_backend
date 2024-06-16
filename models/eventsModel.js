@@ -1,22 +1,47 @@
 const mongoose = require('mongoose');
-const { Schema } = mongoose;
+const Schema = mongoose.Schema;
+
+const ticketTypeSchema = new Schema({
+  ticketName: { type: String, required: true },
+  ticketDiscount: { type: Number, required: true },
+  areaNumber: { type: Number, required: true }
+}, { _id: false });  // 禁用自動生成 _id
+
+const areaSettingSchema = new Schema({
+  areaVenuePic: { type: String, required: true },
+  areaColor: { type: String, required: true },
+  areaName: { type: String, required: true },
+  areaPrice: { type: Number, required: true },
+  areaTicketType: [ticketTypeSchema]
+}, { _id: false });  // 禁用自動生成 _id
+
+const sessionSettingSchema = new Schema({
+  sessionTime: { type: Date, required: true },
+  sessionName: { type: String, required: true },
+  sessionPlace: { type: String, required: true },
+  sessionSalesPeriod: { type: Date, required: true },
+  areaSetting: [areaSettingSchema],
+  id: { type: Schema.Types.ObjectId, ref: 'Session' }  // 手動添加 id 字段
+}, { _id: false });  // 禁用自動生成 _id
 
 const eventSchema = new Schema({
-    eventName: { type: String, required: true },
-    eventDate: { type: Date, required: true },
-    eventPic: { type: String, required: true },
-    coverPic: { type: String, required: true },
-    smallBanner: { type: String, required: true },
-    categoryId: { type: Schema.Types.ObjectId, ref: 'Category' },
-    sponsorId: { type: Schema.Types.ObjectId, ref: 'User' },
-    tagList: [{ type: Schema.Types.ObjectId, ref: 'Tag' }],
-    releaseDate: { type: Date, required: true },
-    eventIntro: { type: String, required: true },
-    status: { type: Number },
-    sessionList: [{ type: mongoose.Schema.ObjectId, ref: 'Session' }],
-    createdAt: { type: Date, default: Date.now, required: true },
-    updatedAt: { type: Date, default: Date.now, required: true }
-}, { timestamps: true });
+  eventName: { type: String, required: true },
+  eventDate: { type: Date, required: true },
+  eventPic: { type: String, required: true },
+  coverPic: { type: String, required: true },
+  smallBanner: { type: String, required: true },
+  categoryId: { type: Schema.Types.ObjectId, ref: 'Category', required: true },
+  tagList: [{ type: Schema.Types.ObjectId, ref: 'Tag' }],
+  releaseDate: { type: Date, required: true },
+  sponsorId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  eventIntro: { type: String, required: true },
+  sessionSetting: [sessionSettingSchema],
+  status: { type: Number, default: 1 },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+}, {
+  timestamps: true // 這會添加 createdAt 和 updatedAt 字段
+});
 
 const Event = mongoose.model('Event', eventSchema);
 
