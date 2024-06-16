@@ -9,6 +9,7 @@ const User = require("../models/usersModel");
 const Event = require('../models/eventsModel');
 const Order = require('../models/ordersModel');
 const Subscription = require('../models/subscriptionModel');
+const Tag = require('../models/tagsModel'); 
 const AppError = require('../appError');
 const verifyToken = require('../middlewares/verifyToken');  
 const sendEmail = require('../utils/sendEmail');
@@ -48,7 +49,7 @@ router.get('/profile/:id', verifyToken, async (req, res, next) => {
     const user = await User.findById(userId, '-password')
       .populate({
         path: 'subscribes',
-        model: Subscription // or 'Subscription' if you prefer
+        model: Subscription
       })
       .populate('focusedEvents');
 
@@ -59,10 +60,49 @@ router.get('/profile/:id', verifyToken, async (req, res, next) => {
       });
     }
 
+    const focusedEvents = await Promise.all(user.focusedEvents.map(async (event) => {
+      const sessions = event.sessionSetting;
+
+      // 賽事地點 (eventPlace)
+      const eventPlace = sessions.reduce((closestSession, session) => {
+        return !closestSession || new Date(session.sessionTime) < new Date(closestSession.sessionTime)
+          ? session
+          : closestSession;
+      }, null)?.sessionPlace;
+
+      // 賽事日期 (eventDate)
+      const eventDateStart = sessions.length > 0 ? new Date(Math.min(...sessions.map(s => new Date(s.sessionTime)))) : null;
+      const eventDateEnd = sessions.length > 0 ? new Date(Math.max(...sessions.map(s => new Date(s.sessionTime)))) : null;
+      const eventDate = eventDateStart && eventDateEnd ? `${eventDateStart.toISOString()} - ${eventDateEnd.toISOString()}` : null;
+
+      // 賽事價錢 (price)
+      const price = Math.min(...sessions.flatMap(s => s.areaSetting.map(a => a.areaPrice)));
+
+      // 售票人數 (ticketSales)
+      const ticketSales = sessions.flatMap(s => s.areaSetting.flatMap(a => a.areaTicketType.map(t => t.areaNumber))).reduce((sum, num) => sum + num, 0);
+
+      // tagList
+      const tagNames = await Tag.find({ _id: { $in: event.tagList } }).select('name').exec();
+
+      // 新的 event 对象
+      return {
+        ...event.toObject(),
+        eventPlace,
+        eventDate,
+        tagList: tagNames.map(tag => tag.name),
+        price,
+        ticketSales,
+        sessionSetting: undefined // 移除 sessionSetting
+      };
+    }));
+
     res.status(200).json({
       status: 'success',
       data: {
-        user
+        user: {
+          ...user.toObject(),
+          focusedEvents
+        }
       }
     });
   } catch (error) {
