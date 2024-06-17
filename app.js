@@ -29,7 +29,8 @@ const corsOptions = {
   origin: [
     'http://localhost:3000', // 允許本地開發環境的請求
     'https://sportspass-backend.onrender.com', // 允許生產環境的請求
-    'https://node-js-frontend-2024.vercel.app'
+    'https://node-js-frontend-2024.vercel.app',
+    'https://node-js-frontend-2024-8mkc110lv-puffys-projects-b63c5996.vercel.app'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
