@@ -26,18 +26,14 @@ const app = express();
 app.use(express.json());
 
 const corsOptions = {
-  origin: [
-    'http://localhost:3000', // 允許本地開發環境的請求
-    'https://sportspass-backend.onrender.com', // 允許生產環境的請求
-    'https://node-js-frontend-2024.vercel.app',
-    'https://node-js-frontend-2024-8mkc110lv-puffys-projects-b63c5996.vercel.app'
-  ],
+  origin: '*', // 允許所有網域請求
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 };
 
 app.use(cors(corsOptions));
+app.use(cors());
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
