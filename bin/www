@@ -17,9 +17,9 @@ const socketIo = require('socket.io');
 const io = socketIo(server, {
   cors: {
     origin: '*', // 允許所有網域請求
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
+    // methods: ['GET', 'POST'],
+    // allowedHeaders: ['Content-Type', 'Authorization'],
+    // credentials: true,
   }
 });
 

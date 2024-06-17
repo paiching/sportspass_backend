@@ -27,9 +27,9 @@ app.use(express.json());
 
 const corsOptions = {
   origin: '*', // 允許所有網域請求
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
+  // methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  // allowedHeaders: ['Content-Type', 'Authorization'],
+  // credentials: true,
 };
 
 app.use(cors(corsOptions));
