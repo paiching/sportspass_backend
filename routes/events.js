@@ -3,10 +3,8 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const { Types } = mongoose;
 const { Event } = require('../models/eventsModel');
-const Order = require('../models/ordersModel');
-const { Session} = require('../models/sessionsModel');
+const { Session } = require('../models/sessionsModel');
 const Category = require('../models/categoryModel');
-const User = require('../models/usersModel');
 const Tag = require('../models/tagsModel'); // 確保正確引入標籤模型
 const jwt = require('jsonwebtoken');
 const verifyToken = require('../middlewares/verifyToken');
@@ -18,6 +16,7 @@ const getUserIdFromToken = (req) => {
   return decoded.id;
 };
 
+// POST create a new event with sessions.
 router.post('/', verifyToken, async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -64,7 +63,7 @@ router.post('/', verifyToken, async (req, res) => {
       releaseDate,
       sponsorId,
       eventIntro,
-      sessionSetting: [], // 暫時設為空
+      sessionList: [], // 初始化 sessionList 為空數組
       status: 1,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -73,6 +72,7 @@ router.post('/', verifyToken, async (req, res) => {
     const savedEvent = await newEvent.save({ session });
 
     // Create sessions and update sessionSetting with ids
+    const sessionIds = [];
     for (const sessionData of sessionSetting) {
       const newSession = new Session({
         eventId: savedEvent._id,
@@ -86,11 +86,12 @@ router.post('/', verifyToken, async (req, res) => {
 
       // Add session id to sessionSetting
       sessionData.id = savedSession._id;
-      newEvent.sessionSetting.push(sessionData);
+      sessionIds.push(savedSession._id);
     }
 
-    // Save updated event with sessionSetting
-    await newEvent.save({ session });
+    // Save updated event with sessionList
+    savedEvent.sessionList = sessionIds;
+    await savedEvent.save({ session });
 
     // 更新 category 的 eventNum
     category.eventNum += 1;
@@ -102,7 +103,11 @@ router.post('/', verifyToken, async (req, res) => {
     // Populate category and tags
     const populatedEvent = await Event.findById(savedEvent._id)
       .populate('categoryId', 'nameTC')
-      .populate('tagList', 'name');
+      .populate('tagList', 'name')
+      .populate({
+        path: 'sessionList',
+        populate: { path: 'areaSetting.areaTicketType', select: 'areaNumber' }
+      });
 
     res.status(201).json({
       status: 'success',
@@ -111,7 +116,9 @@ router.post('/', verifyToken, async (req, res) => {
       }
     });
   } catch (error) {
-    await session.abortTransaction();
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
     session.endSession();
 
     console.error("Error creating event", error);
@@ -131,251 +138,12 @@ router.post('/', verifyToken, async (req, res) => {
   }
 });
 
-// GET events listing with pagination based on sponsorId
-router.get('/sponsor/:id', async (req, res) => {
-
-  const { page = 1, pageSize = 10 } = req.query;
-  const Id = req.params.id;
-
-  try {
-    console.log("Fetching events from database...");
-    const skip = (page - 1) * pageSize;
-    const limit = parseInt(pageSize);
-
-    // Ensure sponsorId is an ObjectId
-    const sponsorObjectId = mongoose.Types.ObjectId.createFromHexString(Id);
-    console.log("Sponsor ObjectId:", sponsorObjectId);
-
-    // Fetch events with pagination based on sponsorId
-    const [events, totalItems] = await Promise.all([
-      Event.find({ sponsorId: sponsorObjectId })
-        .skip(skip)
-        .limit(limit)
-        // .populate({
-        //   path: 'sessionIds',
-        //   select: 'sessionName'
-        // })
-        .populate('categoryId')
-        .populate('sessionList')
-        .populate('tagList')
-        .exec(),
-      Event.countDocuments({ sponsorId: sponsorObjectId })
-    ]);
-
-    // Replace sessionIds with sessionList
-    // const eventsWithSessionList = events.map(event => {
-    //   const eventObject = event.toObject();
-    //   eventObject.sessionList = eventObject.sessionIds;
-    //   delete eventObject.sessionIds;
-    //   return eventObject;
-    // });
-
-    const totalPages = Math.ceil(totalItems / pageSize);
-    ///console.log("Events fetched: ", eventsWithSessionList);
-
-    res.status(200).json({
-      status: 'success',
-      data: {
-        events,
-        pagination: {
-          totalItems,
-          totalPages,
-          currentPage: parseInt(page),
-          pageSize: parseInt(pageSize)
-        }
-      }
-    });
-  } catch (error) {
-    console.error("Database query failed", error);
-    res.status(500).send("Error accessing the database");
-  }
-});
-
-// GET events listing with pagination
-router.get('/list', async (req, res) => {
-  try {
-    console.log("Fetching events from database...");
-
-    const { page = 1, pageSize = 10 } = req.query;
-    const skip = (page - 1) * pageSize;
-    const limit = parseInt(pageSize);
-
-    // Fetch events with pagination
-    const [events, totalItems] = await Promise.all([
-      Event.find()
-        .skip(skip)
-        .limit(limit)
-        //.populate('categoryId')
-        //.populate('sessionList')
-        //.populate('tagList')
-        .exec(),
-      Event.countDocuments()
-    ]);
-
-    const totalPages = Math.ceil(totalItems / pageSize);
-    console.log("Events fetched: ", events);
-
-    res.status(200).json({
-      status: 'success',
-      data: {
-        events,
-        pagination: {
-          totalItems,
-          totalPages,
-          currentPage: parseInt(page),
-          pageSize: parseInt(pageSize)
-        }
-      }
-    });
-  } catch (error) {
-    console.error("Database query failed", error);
-    res.status(500).send("Error accessing the database");
-  }
-});
-
-router.get('/:displayMode', async (req, res) => {
-  const displayMode = req.params.displayMode;
-  const { categoryId, limit, p, q } = req.query;
-
-  console.log("model api");
-  // Validate required query parameters
-  // if (!categoryId || !limit) {
-  //   return res.status(400).json({
-  //     status: 'error',
-  //     message: 'categoryId and limit are required query parameters'
-  //   });
-  // }
-
-  const limitNum = parseInt(limit, 10);
-  const pageNum = p ? parseInt(p, 10) : 1;
-  const skip = (pageNum - 1) * limitNum;
-
-  try {
-    const now = new Date();
-    const match = {
-      categoryId: new mongoose.Types.ObjectId(categoryId)
-    };
-
-    const pipeline = [
-      { $match: match },
-      {
-        $lookup: {
-          from: 'tags',
-          localField: 'tagList',
-          foreignField: '_id',
-          as: 'tagList'
-        }
-      },
-      { $unwind: '$tagList' }
-    ];
-
-    if (q) {
-      pipeline.push({
-        $match: {
-          $or: [
-            { eventName: { $regex: q, $options: 'i' } },
-            { eventIntro: { $regex: q, $options: 'i' } },
-            { 'tagList.name': { $regex: q, $options: 'i' } }
-          ]
-        }
-      });
-    }
-
-    switch (displayMode) {
-      case 'recent':
-        pipeline.push({ $match: { eventDate: { $gte: now } } });
-        break;
-      case 'latestSell':
-        pipeline.push({ $match: { releaseDate: { $lte: now } } });
-        break;
-      case 'latest':
-        pipeline.push({ $sort: { createdAt: -1 } });
-        break;
-      case 'hot':
-        // Add sorting/filtering logic for hot events if applicable
-        break;
-      case 'upcoming':
-        pipeline.push({ $match: { eventDate: { $gte: now, $lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) } } });
-        break;
-      case 'other':
-        // Custom logic for other events if necessary
-        break;
-    }
-
-    pipeline.push(
-      {
-        $lookup: {
-          from: 'sessions',
-          localField: 'sessionList',
-          foreignField: '_id',
-          as: 'sessions'
-        }
-      },
-      {
-        $addFields: {
-          eventPeriod: {
-            start: { $min: "$sessions.sessionTime" },
-            end: { $max: "$sessions.sessionTime" }
-          }
-        }
-      },
-      {
-        $project: {
-          sessionList: 0, // Exclude sessionList
-          sessions: 0    // Exclude sessions
-        }
-      },
-      { $skip: skip },
-      { $limit: limitNum },
-      {
-        $lookup: {
-          from: 'categories',
-          localField: 'categoryId',
-          foreignField: '_id',
-          as: 'categoryId'
-        }
-      },
-      {
-        $addFields: {
-          categoryId: { $arrayElemAt: ['$categoryId', 0] }
-        }
-      }
-    );
-
-    console.log('Aggregation Pipeline:', JSON.stringify(pipeline)); // Debug output to check the aggregation pipeline
-
-    const events = await Event.aggregate(pipeline);
-
-    console.log('Events found:', events.length); // Debug output to check the number of events found
-    events.forEach(event => {
-      console.log('Event Sessions:', event.sessions); // Debug output to check sessions data
-      console.log('Activity Period:', event.activityPeriod); // Debug output to check activity period
-    });
-
-    res.status(200).json({
-      status: 'success',
-      data: {
-        events
-      }
-    });
-  } catch (error) {
-    console.error("Error fetching events", error);
-    res.status(500).send("Error fetching events");
-  }
-});
-
-
-
-
-
-
-/* GET a specific event by ID, including related sessions. */
+// GET a specific event by ID, including related sessions
 router.get('/:id', async (req, res) => {
   try {
     const event = await Event.findById(req.params.id)
       .populate('sessionList')
       .populate('categoryId')
-      .populate('sessionList')
       .populate('tagList')
       .exec();
 
@@ -386,10 +154,19 @@ router.get('/:id', async (req, res) => {
       });
     }
 
+    // 計算所有 areaNumber 的總和
+    let totalSeatsAvailable = 0;
+    event.sessionList.forEach(session => {
+      session.areaSetting.forEach(area => {
+        area.areaTicketType.forEach(ticket => {
+          totalSeatsAvailable += ticket.areaNumber;
+        });
+      });
+    });
+
     // Convert to plain object to manipulate
     const eventObject = event.toObject();
-    eventObject.sessionList = eventObject.sessionIds;
-    delete eventObject.sessionIds;
+    eventObject.seatsAvailable = totalSeatsAvailable;
 
     res.status(200).json({
       status: 'success',
@@ -402,8 +179,6 @@ router.get('/:id', async (req, res) => {
     res.status(500).send("Error fetching event");
   }
 });
-
-
 
 /* PUT update a specific event by ID. */
 router.patch('/:id', async (req, res) => {
@@ -420,8 +195,8 @@ router.patch('/:id', async (req, res) => {
       eventPic,
       coverPic,
       smallBanner,
-      categoryId: new mongoose.Types.ObjectId,
-      tagId: Array.isArray(sessionIds) ? sessionIds.map(id => new mongoose.Types.ObjectId) : [],
+      categoryId: new mongoose.Types.ObjectId(categoryId),
+      tagId: Array.isArray(tagId) ? tagId.map(id => new mongoose.Types.ObjectId(id)) : [],
       releaseDate,
       eventIntro,
       status,
@@ -429,7 +204,7 @@ router.patch('/:id', async (req, res) => {
     };
 
     if (sessionIds) {
-      updateData.sessionIds = sessionIds.map(id => mongoose.Types.ObjectId.createFromHexString(id));
+      updateData.sessionList = sessionIds.map(id => mongoose.Types.ObjectId.createFromHexString(id));
     }
 
     const event = await Event.findByIdAndUpdate(req.params.id, updateData, { new: true });
