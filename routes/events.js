@@ -80,8 +80,17 @@ router.post('/', verifyToken, async (req, res) => {
         sessionTime: sessionData.sessionTime,
         sessionPlace: sessionData.sessionPlace,
         sessionSalesPeriod: sessionData.sessionSalesPeriod,
+        areaVenuePic: sessionData.areaVenuePic, // 添加 areaVenuePic
         areaSetting: sessionData.areaSetting
       });
+
+      // 計算 seatsAvailable
+      let totalSeatsAvailable = 0;
+      newSession.areaSetting.forEach(area => {
+        totalSeatsAvailable += area.areaNumber;
+      });
+      newSession.seatsAvailable = totalSeatsAvailable;
+
       const savedSession = await newSession.save({ session });
 
       // Add session id to sessionSetting
@@ -138,11 +147,16 @@ router.post('/', verifyToken, async (req, res) => {
   }
 });
 
-// GET a specific event by ID, including related sessions
+// GET a specific event by ID, including related sessions and calculating seatsAvailable
 router.get('/:id', async (req, res) => {
   try {
     const event = await Event.findById(req.params.id)
-      .populate('sessionList')
+      .populate({
+        path: 'sessionList',
+        populate: {
+          path: 'areaSetting'
+        }
+      })
       .populate('categoryId')
       .populate('tagList')
       .exec();
@@ -158,9 +172,7 @@ router.get('/:id', async (req, res) => {
     let totalSeatsAvailable = 0;
     event.sessionList.forEach(session => {
       session.areaSetting.forEach(area => {
-        area.areaTicketType.forEach(ticket => {
-          totalSeatsAvailable += ticket.areaNumber;
-        });
+        totalSeatsAvailable += area.areaNumber;
       });
     });
 

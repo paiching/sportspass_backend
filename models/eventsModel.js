@@ -3,15 +3,14 @@ const { Schema } = mongoose;
 
 const ticketTypeSchema = new Schema({
   ticketName: { type: String, required: true },
-  ticketDiscount: { type: Number, required: true },
-  areaNumber: { type: Number, required: true }
+  ticketDiscount: { type: Number, required: true }
 }, { _id: false });  // 禁用自動生成 _id
 
 const areaSettingSchema = new Schema({
-  areaVenuePic: { type: String, required: true },
   areaColor: { type: String, required: true },
   areaName: { type: String, required: true },
   areaPrice: { type: Number, required: true },
+  areaNumber: { type: Number, required: true },
   areaTicketType: [ticketTypeSchema]
 }, { _id: false });  // 禁用自動生成 _id
 
@@ -19,14 +18,14 @@ const sessionSettingSchema = new Schema({
   sessionTime: { type: Date, required: true },
   sessionName: { type: String, required: true },
   sessionPlace: { type: String, required: true },
-  sessionSalesPeriod: { type: Date, required: true },
-  areaSetting: [areaSettingSchema],
-  id: { type: Schema.Types.ObjectId, ref: 'Session' }  // 手動添加 id 字段
+  sessionSalesPeriod: [Date], // 修改为数组
+  areaVenuePic: { type: String, required: true },
+  areaSetting: [areaSettingSchema]
 }, { _id: false });  // 禁用自動生成 _id
 
 const eventSchema = new Schema({
   eventName: { type: String, required: true },
-  eventDate: { type: Date, required: true },
+  eventDate: [Date], // 修改为数组
   eventPic: { type: String, required: true },
   coverPic: { type: String, required: true },
   smallBanner: { type: String, required: true },

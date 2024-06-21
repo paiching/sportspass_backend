@@ -23,17 +23,28 @@ router.get('/list', async (req, res) => {
 // GET a single session by ID
 router.get('/:id', async (req, res) => {
   try {
-    const session = await Session.findById(req.params.id).populate('eventId');
+    const session = await Session.findById(req.params.id).populate({
+      path: 'eventId',
+      select: '-sessionList -status -createdAt -updatedAt -sessionSetting -__v'  // 排除不需要的字段
+    });
     if (!session) {
       return res.status(404).json({
         status: 'error',
         message: 'Session not found'
       });
     }
+
+    // 計算 seatsAvailable
+    let totalSeatsAvailable = 0;
+    session.areaSetting.forEach(area => {
+      totalSeatsAvailable += area.areaNumber;
+    });
+    session.seatsAvailable = totalSeatsAvailable;
+
     res.status(200).json({
       status: 'success',
       data: {
-        session
+        session: session.toObject()
       }
     });
   } catch (error) {
@@ -43,8 +54,8 @@ router.get('/:id', async (req, res) => {
 });
 
 // PATCH API to update areaNumber in areaSetting
-router.patch('/updateAreaNumber/:sessionId/:areaSettingId/:ticketId', async (req, res) => {
-  const { sessionId, areaSettingId, ticketId } = req.params;
+router.patch('/updateAreaNumber/:sessionId/:areaSettingId', async (req, res) => {
+  const { sessionId, areaSettingId } = req.params;
   const { areaNumber } = req.body;
 
   try {
@@ -64,15 +75,15 @@ router.patch('/updateAreaNumber/:sessionId/:areaSettingId/:ticketId', async (req
       });
     }
 
-    const ticketType = areaSetting.areaTicketType.id(ticketId);
-    if (!ticketType) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Ticket type not found'
-      });
-    }
+    areaSetting.areaNumber = areaNumber;
 
-    ticketType.areaNumber = areaNumber;
+    // 更新 seatsAvailable
+    let totalSeatsAvailable = 0;
+    session.areaSetting.forEach(area => {
+      totalSeatsAvailable += area.areaNumber;
+    });
+    session.seatsAvailable = totalSeatsAvailable;
+
     await session.save();
 
     res.status(200).json({
