@@ -12,20 +12,20 @@ const areaSettingSchema = new Schema({
   areaPrice: { type: Number, required: true },
   areaNumber: { type: Number, required: true },
   areaTicketType: [ticketTypeSchema]
-}, { _id: false });  // 禁用自動生成 _id
+}, { _id: false });  
 
 const sessionSettingSchema = new Schema({
   sessionTime: { type: Date, required: true },
   sessionName: { type: String, required: true },
   sessionPlace: { type: String, required: true },
-  sessionSalesPeriod: [Date], // 修改为数组
+  sessionSalesPeriod: [Date], 
   areaVenuePic: { type: String, required: true },
   areaSetting: [areaSettingSchema]
-}, { _id: false });  // 禁用自動生成 _id
+}, { _id: false });  
 
 const eventSchema = new Schema({
   eventName: { type: String, required: true },
-  eventDate: [Date], // 修改为数组
+  eventDate: [Date], 
   eventPic: { type: String, required: true },
   coverPic: { type: String, required: true },
   smallBanner: { type: String, required: true },
