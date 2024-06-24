@@ -23,7 +23,10 @@ router.post('/', verifyToken, async (req, res) => {
 
   try {
     const userId = getUserIdFromToken(req);
+    console.log('UserId extracted from token:', userId);
+
     const { eventId, sessionId, cart, total } = req.body;
+    console.log('Request body:', req.body);
 
     const ticketIds = [];
     let ticketSales = 0;
@@ -43,8 +46,14 @@ router.post('/', verifyToken, async (req, res) => {
           price,
           status: 0 // 初始狀態為未使用
         });
-        const savedTicket = await ticket.save({ session });
-        ticketIds.push(savedTicket._id);
+
+        try {
+          const savedTicket = await ticket.save({ session });
+          ticketIds.push(savedTicket._id);
+        } catch (ticketError) {
+          console.error("Error saving ticket:", ticketError);
+          throw ticketError;
+        }
       }
       
       // 計算 ticketSales 和 salesTotal
@@ -64,9 +73,22 @@ router.post('/', verifyToken, async (req, res) => {
       updatedAt: new Date()
     });
 
-    await newOrder.save({ session });
+    try {
+      await newOrder.save({ session });
+    } catch (orderError) {
+      console.error("Error saving order:", orderError);
+      throw orderError;
+    }
 
-    await Event.findByIdAndUpdate(eventId, { $push: { orderId: newOrder._id } });
+    try {
+      const updatedEvent = await Event.findByIdAndUpdate(eventId, { $push: { orderId: newOrder._id } });
+      if (!updatedEvent) {
+        throw new Error(`Event with ID ${eventId} not found`);
+      }
+    } catch (eventUpdateError) {
+      console.error("Error updating event with new order ID:", eventUpdateError);
+      throw eventUpdateError;
+    }
 
     await session.commitTransaction();
     session.endSession();
@@ -80,8 +102,8 @@ router.post('/', verifyToken, async (req, res) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-    console.error("Error creating order", error);
-    res.status(500).send("Error creating order");
+    console.error("Error creating order:", error);
+    res.status(500).send(`Error creating order: ${error.message}`);
   }
 });
 
