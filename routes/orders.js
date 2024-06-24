@@ -3,42 +3,73 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const Order = require('../models/ordersModel');
-const Event = require('../models/eventsModel');
+const { Event } = require('../models/eventsModel'); // 確保正確引入 Event 模型
 const Sponsor = require('../models/usersModel');
+const Ticket = require('../models/ticketsModel');
+const verifyToken = require('../middlewares/verifyToken');
+const jwt = require('jsonwebtoken'); // 引入 jwt 模組
 
-
+// 提取 userID 的函數
+const getUserIdFromToken = (req) => {
+  const token = req.headers.authorization.split(' ')[1];
+  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  return decoded.id;
+};
 
 // CREATE a new order
-router.post('/', async (req, res) => {
-  try {
-    const {
-      userId, sponsorId, ticketId, eventId, sessionId, salesList,
-      ticketSales, salesTotal, unTicket, unTicketTotal, orderTotal, totalAmount, orderState
-    } = req.body;
+router.post('/', verifyToken, async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-    // Create a new order
+  try {
+    const userId = getUserIdFromToken(req);
+    const { eventId, sessionId, cart, total } = req.body;
+
+    const ticketIds = [];
+    let ticketSales = 0;
+    let salesTotal = 0;
+
+    for (const cartItem of cart) {
+      const { areaColor, areaName, ticketName, ticketDiscount, ticketNumber, price } = cartItem;
+
+      for (let i = 0; i < ticketNumber; i++) {
+        const ticket = new Ticket({
+          eventId,
+          sessionId,
+          areaColor,
+          areaName,
+          ticketName,
+          ticketDiscount,
+          price,
+          status: 0 // 初始狀態為未使用
+        });
+        const savedTicket = await ticket.save({ session });
+        ticketIds.push(savedTicket._id);
+      }
+      
+      // 計算 ticketSales 和 salesTotal
+      ticketSales += ticketNumber;
+      salesTotal += price * ticketNumber;
+    }
+
     const newOrder = new Order({
       userId,
-      sponsorId,
-      ticketId,
-      //eventId,
-      //sessionId,
-      //salesList,
+      ticketId: ticketIds,
       ticketSales,
       salesTotal,
-      unTicket,
-      unTicketTotal,
-      orderTotal,
-      totalAmount,
-      orderState,
+      orderTotal: salesTotal,
+      totalAmount: total,
+      status: 0, // 初始狀態為未付款
       createdAt: new Date(),
       updatedAt: new Date()
     });
 
-    await newOrder.save();
+    await newOrder.save({ session });
 
-    // Update the related Event, adding the new orderId to the orderId array
     await Event.findByIdAndUpdate(eventId, { $push: { orderId: newOrder._id } });
+
+    await session.commitTransaction();
+    session.endSession();
 
     res.status(201).json({
       status: 'success',
@@ -47,6 +78,8 @@ router.post('/', async (req, res) => {
       }
     });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error("Error creating order", error);
     res.status(500).send("Error creating order");
   }
@@ -61,7 +94,7 @@ router.get('/list', async (req, res) => {
         {
           path: 'eventId',
           model: 'Event', // Model name of the event
-          select: 'eventName' // Specify the fields you want to include from the Event model
+          select: 'eventName eventPic' // Specify the fields you want to include from the Event model
         },
         {
           path: 'sessionId',

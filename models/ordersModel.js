@@ -8,22 +8,16 @@ const seatSchema = new Schema({
 
 
 const orderSchema = new Schema({
-   
-    //orderNumber: { type: String, required: true },
+
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    //sponsorId: { type: Schema.Types.ObjectId},
     ticketId: [{ type: Schema.Types.ObjectId, ref: 'Ticket' }],
-    //eventId: { type: Schema.Types.ObjectId, ref: 'Event', required: true },
-    //sessionId: { type: Schema.Types.ObjectId, ref: 'Session', required: true },
-    //salesList: [{ type: Schema.Types.ObjectId, ref: 'Sale' }],
     ticketSales: { type: Number },
     salesTotal: { type: Number },
-    unTicket: { type: Number },
-    unTicketTotal: { type: Number },
     orderTotal: { type: Number },
     totalAmount: { type: Number, required: true },
-    orderState: { type: String, required: true },
-    createdAt: { type: Date, default: Date.now }
+    status: { type: Number, required: true, enum: [0, 1, 2], default: 0 }, // 0: 未付款, 1: 已付款 
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 
 const Order = mongoose.model('Order', orderSchema);
