@@ -148,49 +148,59 @@ router.post('/', verifyToken, async (req, res) => {
 });
 
 // GET a specific event by ID, including related sessions and calculating seatsAvailable
-// router.get('/:id', async (req, res) => {
-//   try {
-//     const event = await Event.findById(req.params.id)
-//       .populate({
-//         path: 'sessionList',
-//         populate: {
-//           path: 'areaSetting'
-//         }
-//       })
-//       .populate('categoryId')
-//       .populate('tagList')
-//       .exec();
+router.get('/detail/:id', async (req, res) => {
+  try {
+    // 使用 findById 查找特定賽事
+    const event = await Event.findById(req.params.id)
+      .populate({
+        path: 'sessionList',
+        populate: {
+          path: 'areaSetting.areaTicketType', // 確保嵌套填充 areaTicketType
+          select: 'ticketName ticketDiscount' // 選擇需要的欄位
+        }
+      })
+      .populate('categoryId', 'nameTC nameEN photo') // 填充 categoryId 並選擇需要的欄位
+      .populate('tagList', 'name') // 填充 tagList 並選擇需要的欄位
+      .exec();
 
-//     if (!event) {
-//       return res.status(404).json({
-//         status: 'error',
-//         message: 'Event not found'
-//       });
-//     }
+    // 如果未找到賽事，返回 404 錯誤
+    if (!event) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Event not found'
+      });
+    }
 
-//     // 計算所有 areaNumber 的總和
-//     let totalSeatsAvailable = 0;
-//     event.sessionList.forEach(session => {
-//       session.areaSetting.forEach(area => {
-//         totalSeatsAvailable += area.areaNumber;
-//       });
-//     });
+    // 計算所有 areaNumber 的總和
+    let totalSeatsAvailable = 0;
+    event.sessionList.forEach(session => {
+      session.areaSetting.forEach(area => {
+        totalSeatsAvailable += area.areaNumber;
+      });
+    });
 
-//     // Convert to plain object to manipulate
-//     const eventObject = event.toObject();
-//     eventObject.seatsAvailable = totalSeatsAvailable;
+    // 將 event 轉換為 plain object 以便操作
+    const eventObject = event.toObject();
+    eventObject.seatsAvailable = totalSeatsAvailable;
 
-//     res.status(200).json({
-//       status: 'success',
-//       data: {
-//         event: eventObject
-//       }
-//     });
-//   } catch (error) {
-//     console.error("Error fetching event", error);
-//     res.status(500).send("Error fetching event");
-//   }
-// });
+    // 返回成功響應
+    res.status(200).json({
+      status: 'success',
+      data: {
+        event: eventObject
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching event", error);
+
+    // 返回 500 錯誤並包含錯誤信息
+    res.status(500).json({
+      status: 'error',
+      message: 'Error fetching event',
+      details: error.message
+    });
+  }
+});
 
 /* PUT update a specific event by ID. */
 router.patch('/:id', async (req, res) => {
