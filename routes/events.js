@@ -320,7 +320,7 @@ router.get('/list', async (req, res) => {
 });
 
 // GET events listing with filter by category nameTC
-router.get('/mode/:displayMode', async (req, res) => {
+router.get('/filter/:displayMode', async (req, res) => {
   const displayMode = req.params.displayMode;
   const { nameTC, limit, p, q } = req.query;
 
