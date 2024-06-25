@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const { Types } = mongoose;
-const { Event } = require('../models/eventsModel');
+const  Event  = require('../models/eventsModel');
 const { Session } = require('../models/sessionsModel');
 const Category = require('../models/categoryModel');
 const Tag = require('../models/tagsModel'); // 確保正確引入標籤模型
@@ -148,49 +148,49 @@ router.post('/', verifyToken, async (req, res) => {
 });
 
 // GET a specific event by ID, including related sessions and calculating seatsAvailable
-router.get('/:id', async (req, res) => {
-  try {
-    const event = await Event.findById(req.params.id)
-      .populate({
-        path: 'sessionList',
-        populate: {
-          path: 'areaSetting'
-        }
-      })
-      .populate('categoryId')
-      .populate('tagList')
-      .exec();
+// router.get('/:id', async (req, res) => {
+//   try {
+//     const event = await Event.findById(req.params.id)
+//       .populate({
+//         path: 'sessionList',
+//         populate: {
+//           path: 'areaSetting'
+//         }
+//       })
+//       .populate('categoryId')
+//       .populate('tagList')
+//       .exec();
 
-    if (!event) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Event not found'
-      });
-    }
+//     if (!event) {
+//       return res.status(404).json({
+//         status: 'error',
+//         message: 'Event not found'
+//       });
+//     }
 
-    // 計算所有 areaNumber 的總和
-    let totalSeatsAvailable = 0;
-    event.sessionList.forEach(session => {
-      session.areaSetting.forEach(area => {
-        totalSeatsAvailable += area.areaNumber;
-      });
-    });
+//     // 計算所有 areaNumber 的總和
+//     let totalSeatsAvailable = 0;
+//     event.sessionList.forEach(session => {
+//       session.areaSetting.forEach(area => {
+//         totalSeatsAvailable += area.areaNumber;
+//       });
+//     });
 
-    // Convert to plain object to manipulate
-    const eventObject = event.toObject();
-    eventObject.seatsAvailable = totalSeatsAvailable;
+//     // Convert to plain object to manipulate
+//     const eventObject = event.toObject();
+//     eventObject.seatsAvailable = totalSeatsAvailable;
 
-    res.status(200).json({
-      status: 'success',
-      data: {
-        event: eventObject
-      }
-    });
-  } catch (error) {
-    console.error("Error fetching event", error);
-    res.status(500).send("Error fetching event");
-  }
-});
+//     res.status(200).json({
+//       status: 'success',
+//       data: {
+//         event: eventObject
+//       }
+//     });
+//   } catch (error) {
+//     console.error("Error fetching event", error);
+//     res.status(500).send("Error fetching event");
+//   }
+// });
 
 /* PUT update a specific event by ID. */
 router.patch('/:id', async (req, res) => {
@@ -267,6 +267,7 @@ router.delete('/:id', async (req, res) => {
 
 // GET events listing with pagination and category filter
 router.get('/list', async (req, res) => {
+
   try {
     const { page = 1, pageSize = 10, categoryId } = req.query;
     const skip = (page - 1) * pageSize;
@@ -274,6 +275,8 @@ router.get('/list', async (req, res) => {
 
     // Validate categoryId if provided
     const filter = {};
+
+    console.log(categoryId);
     if (categoryId) {
       if (!mongoose.Types.ObjectId.isValid(categoryId)) {
         return res.status(400).json({
@@ -281,7 +284,7 @@ router.get('/list', async (req, res) => {
           message: '無效的類別ID'
         });
       }
-      filter.categoryId = categoryId;
+      filter.categoryId = new mongoose.Types.ObjectId(categoryId);
     }
 
     // Fetch events with pagination
@@ -290,8 +293,8 @@ router.get('/list', async (req, res) => {
         .skip(skip)
         .limit(limit)
         .populate('categoryId')
-        .populate('sessionList')
-        .populate('tagList')
+        // .populate('sessionList')
+        // .populate('tagList')
         .exec(),
       Event.countDocuments(filter)
     ]);
