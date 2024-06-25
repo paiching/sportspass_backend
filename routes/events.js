@@ -319,15 +319,16 @@ router.get('/list', async (req, res) => {
   }
 });
 
+// GET events listing with filter by category nameTC
 router.get('/mode/:displayMode', async (req, res) => {
   const displayMode = req.params.displayMode;
-  const { categoryId, limit, p, q } = req.query;
+  const { nameTC, limit, p, q } = req.query;
 
   // Validate required query parameters
-  if (!categoryId || !limit) {
+  if (!nameTC || !limit) {
     return res.status(400).json({
       status: 'error',
-      message: 'categoryId and limit are required query parameters'
+      message: 'nameTC and limit are required query parameters'
     });
   }
 
@@ -337,8 +338,18 @@ router.get('/mode/:displayMode', async (req, res) => {
 
   try {
     const now = new Date();
+
+    // Find the category by nameTC
+    const category = await Category.findOne({ nameTC });
+    if (!category) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Category not found'
+      });
+    }
+
     const match = {
-      categoryId: new mongoose.Types.ObjectId(categoryId)
+      categoryId: category._id
     };
 
     // Initial match for categoryId
@@ -369,24 +380,41 @@ router.get('/mode/:displayMode', async (req, res) => {
     }
 
     switch (displayMode) {
+      case 'all':
+        break;
       case 'recent':
         pipeline.push({ $match: { eventDate: { $gte: now } } });
+        pipeline.push({ $sort: { eventDate: -1 } });
         break;
       case 'latestSell':
-        pipeline.push({ $match: { releaseDate: { $lte: now } } });
+        pipeline.push({ $match: { 'sessionList.sessionSalesPeriod': { $lte: now } } });
+        pipeline.push({ $sort: { 'sessionList.sessionSalesPeriod': -1 } });
         break;
       case 'latest':
-        pipeline.push({ $sort: { createdAt: -1 } });
+        pipeline.push({ $sort: { releaseDate: -1 } });
         break;
       case 'hot':
-        // Add sorting/filtering logic for hot events if applicable
+        pipeline.push({ $sort: { 'sessionList.bookTicket': -1 } });
         break;
       case 'upcoming':
-        pipeline.push({ $match: { eventDate: { $gte: now, $lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) } } });
+        pipeline.push({
+          $match: {
+            'sessionList.sessionTime': {
+              $gte: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
+              $lte: now
+            }
+          }
+        });
+        pipeline.push({ $sort: { 'sessionList.sessionTime': 1 } });
         break;
       case 'other':
         // Custom logic for other events if necessary
         break;
+      default:
+        return res.status(400).json({
+          status: 'error',
+          message: 'Invalid displayMode'
+        });
     }
 
     pipeline.push(
