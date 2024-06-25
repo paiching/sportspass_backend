@@ -126,16 +126,24 @@ router.get('/list', async (req, res) => {
       ]
     });
 
-     // Convert ticketId to ticketList, eventId to eventDetail, and sessionId to sessionDetail
+    // Convert ticketId to ticketList, eventId to eventDetail, and sessionId to sessionDetail
     const ordersWithModifiedFields = orders.map(order => {
       const orderObject = order.toObject();
       orderObject.ticketList = orderObject.ticketId.map(ticket => {
+        const eventDetails = ticket.eventId || {}; // Ensure eventDetails is not null
+        const sessionDetails = ticket.sessionId || {}; // Ensure sessionDetails is not null
+
         return {
           ...ticket,
-          eventDetails: ticket.eventId,
-          sessionDetails: ticket.sessionId,
+          eventDetails,
+          sessionDetails,
           eventId: undefined,
-          sessionId: undefined
+          sessionId: undefined,
+          eventName: eventDetails.eventName || 'Unknown Event',
+          eventPic: eventDetails.eventPic || '',
+          sessionTime: sessionDetails.sessionTime || 'Unknown Time',
+          sessionName: sessionDetails.sessionName || 'Unknown Session',
+          sessionPlace: sessionDetails.sessionPlace || 'Unknown Place'
         };
       });
       delete orderObject.ticketId;
@@ -153,6 +161,8 @@ router.get('/list', async (req, res) => {
     res.status(500).send("Error fetching orders");
   }
 });
+
+module.exports = router;
 
 // READ a specific order by ID
 router.get('/:id', async (req, res) => {
