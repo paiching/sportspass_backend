@@ -3,6 +3,7 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const { Session } = require('../models/sessionsModel');
 const { Event } = require('../models/eventsModel');
+const moment = require('moment');
 
 // GET all sessions
 router.get('/list', async (req, res) => {
@@ -34,17 +35,75 @@ router.get('/:id', async (req, res) => {
       });
     }
 
-    // 計算 seatsAvailable
-    let totalSeatsAvailable = 0;
-    session.areaSetting.forEach(area => {
-      totalSeatsAvailable += area.areaNumber;
-    });
-    session.seatsAvailable = totalSeatsAvailable;
+    const now = moment();  // 獲取當前時間
+    const salesStart = moment(session.sessionSalesPeriod[0]);  // 販賣區間開始時間
+    const salesEnd = moment(session.sessionSalesPeriod[1]);  // 販賣區間結束時間
+
+    // 根據時間決定是否進行座位計算
+    let bookTicket = 0;
+    let isSoldOut = false;
+    let sessionState = "open";  // 預設狀態為 open
+    let seatsAvailable = 0;
+
+    if (now.isBefore(salesStart)) {
+      // 如果當前時間小於販賣區間開始時間，顯示販賣區間的第一個時間
+      bookTicket = "販賣區間尚未開始";
+    } else if (now.isSameOrAfter(salesStart) && now.isBefore(salesEnd)) {
+      // 當前時間在販賣區間內，進行座位計算
+      let totalSeatsAvailable = 0;
+      session.areaSetting.forEach(area => {
+        totalSeatsAvailable += area.areaNumber;
+      });
+      session.seatsAvailable = totalSeatsAvailable;
+
+      const seatsTotal = totalSeatsAvailable;
+      bookTicket = session.bookTicket || 0;  // 需要確保有 bookTicket 的值
+
+      if (seatsTotal > bookTicket) {
+        seatsAvailable = seatsTotal - bookTicket;
+        isSoldOut = false;
+      } else if (seatsTotal === bookTicket) {
+        seatsAvailable = 0;
+        isSoldOut = true;
+      }
+    } else if (now.isSameOrAfter(salesEnd)) {
+      // 當前時間超過販賣區間
+      sessionState = "close";
+
+      let totalSeatsAvailable = 0;
+      session.areaSetting.forEach(area => {
+        totalSeatsAvailable += area.areaNumber;
+      });
+      session.seatsAvailable = totalSeatsAvailable;
+
+      const seatsTotal = totalSeatsAvailable;
+      bookTicket = session.bookTicket || 0;  // 需要確保有 bookTicket 的值
+
+      if (seatsTotal > bookTicket) {
+        seatsAvailable = seatsTotal - bookTicket;
+        isSoldOut = false;
+      } else if (seatsTotal === bookTicket) {
+        seatsAvailable = 0;
+        isSoldOut = true;
+      }
+    }
+
+    // 添加新的屬性
+    const extendedSession = {
+      ...session.toObject(),
+      bookTicket: bookTicket,
+      enterVenue: session.enterVenue || 0,  // 確保有 enterVenue 的值
+      seatsTotal: session.seatsAvailable || 0,  // 確保有 seatsTotal 的值
+      sessionState: sessionState,
+      detailEventUrl: session.detailEventUrl || "",  // 確保有 detailEventUrl 的值
+      isSoldOut: isSoldOut,
+      seatsAvailable: seatsAvailable
+    };
 
     res.status(200).json({
       status: 'success',
       data: {
-        session: session.toObject()
+        session: extendedSession
       }
     });
   } catch (error) {
