@@ -13,19 +13,26 @@ router.post('/image', upload.single('file'), function (req, res) {
 
   const blob = bucket.file(req.file.originalname);
   const blobStream = blob.createWriteStream({
+    resumable: false,
     metadata: {
       contentType: req.file.mimetype,
     },
   });
 
   blobStream.on('error', (err) => {
-    console.log(err);
+    console.log('Blob Stream Error:', err);
     res.status(500).send('Unable to upload at the moment.');
   });
 
-  blobStream.on('finish', () => {
-    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
-    res.status(200).send({ fileName: req.file.originalname, fileLocation: publicUrl });
+  blobStream.on('finish', async () => {
+    try {
+      await blob.makePublic(); // 確保文件公開可讀
+      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
+      res.status(200).send({ fileName: req.file.originalname, fileLocation: publicUrl });
+    } catch (err) {
+      console.log('Public URL Error:', err);
+      res.status(500).send('Unable to set the file to be publicly accessible.');
+    }
   });
 
   blobStream.end(req.file.buffer);
