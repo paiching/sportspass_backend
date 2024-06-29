@@ -3,6 +3,7 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const { Types } = mongoose;
 const  Event  = require('../models/eventsModel');
+const  Ticket  = require('../models/ticketsModel');
 const { Session } = require('../models/sessionsModel');
 const Category = require('../models/categoryModel');
 const Tag = require('../models/tagsModel'); // 確保正確引入標籤模型
@@ -173,30 +174,47 @@ router.get('/detail/:id', async (req, res) => {
 
     const now = new Date();
     let totalSeatsAvailable = 0;
+    let totalSeatsSold = 0;
 
     // 更新每個 session 的狀態和是否完售屬性
-    event.sessionList.forEach(session => {
+    for (const session of event.sessionList) {
       const sessionStartTime = new Date(session.sessionSalesPeriod[0]);
       const sessionEndTime = new Date(session.sessionSalesPeriod[1]);
 
+      // 計算總座位數
+      const sessionTotalSeats = session.areaSetting.reduce((total, area) => total + area.areaNumber, 0);
+      session.seatsTotal = sessionTotalSeats;
+
+      // 計算可用座位數
+      const seatsAvailable = session.areaSetting.reduce((total, area) => total + area.areaNumber, 0);
+      session.seatsAvailable = seatsAvailable;
+      totalSeatsAvailable += seatsAvailable;
+
+      // 計算已售票數
+      session.bookTicket = sessionTotalSeats - seatsAvailable;
+
+      // 計算已入場的票數
+      const ticketsUsed = await Ticket.countDocuments({ sessionId: session._id, status: 1 });
+      session.enterVenue = ticketsUsed;
+
       if (now < sessionStartTime) {
-        session.sessionState = '尚未開始';
+        session.sessionState = '未開賣';
         session.openTime = session.sessionSalesPeriod[0];
       } else if (now >= sessionStartTime && now <= sessionEndTime) {
         session.sessionState = '開售中';
-        const seatsSold = session.areaSetting.reduce((total, area) => total + area.areaNumber, 0);
-        session.isSoldOut = seatsSold >= totalSeatsAvailable;
+        session.isSoldOut = session.bookTicket >= sessionTotalSeats;
+        totalSeatsSold += session.bookTicket;
       } else {
         session.sessionState = '已結束';
+        session.isSoldOut = session.bookTicket >= sessionTotalSeats;
+        totalSeatsSold += session.bookTicket;
       }
-
-      // 計算總座位數
-      totalSeatsAvailable += session.areaSetting.reduce((total, area) => total + area.areaNumber, 0);
-    });
+    }
 
     // 將 event 轉換為 plain object 以便操作
     const eventObject = event.toObject();
     eventObject.seatsAvailable = totalSeatsAvailable;
+    eventObject.isSoldOut = totalSeatsSold >= totalSeatsAvailable;
 
     // 返回成功響應
     res.status(200).json({
@@ -216,6 +234,9 @@ router.get('/detail/:id', async (req, res) => {
     });
   }
 });
+
+
+
 
 /* PUT update a specific event by ID. */
 router.patch('/:id', async (req, res) => {
