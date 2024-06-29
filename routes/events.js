@@ -75,6 +75,13 @@ router.post('/', verifyToken, async (req, res) => {
     // Create sessions and update sessionSetting with ids
     const sessionIds = [];
     for (const sessionData of sessionSetting) {
+      let totalSeatsAvailable = 0;
+      let totalSeats = 0;
+      sessionData.areaSetting.forEach(area => {
+        totalSeatsAvailable += area.areaNumber;
+        totalSeats += area.areaNumber;
+      });
+
       const newSession = new Session({
         eventId: savedEvent._id,
         sessionName: sessionData.sessionName,
@@ -82,15 +89,10 @@ router.post('/', verifyToken, async (req, res) => {
         sessionPlace: sessionData.sessionPlace,
         sessionSalesPeriod: sessionData.sessionSalesPeriod,
         areaVenuePic: sessionData.areaVenuePic, // 添加 areaVenuePic
-        areaSetting: sessionData.areaSetting
+        areaSetting: sessionData.areaSetting,
+        seatsAvailable: totalSeatsAvailable,
+        seatsTotal: totalSeats,
       });
-
-      // 計算 seatsAvailable
-      let totalSeatsAvailable = 0;
-      newSession.areaSetting.forEach(area => {
-        totalSeatsAvailable += area.areaNumber;
-      });
-      newSession.seatsAvailable = totalSeatsAvailable;
 
       const savedSession = await newSession.save({ session });
 
@@ -151,20 +153,18 @@ router.post('/', verifyToken, async (req, res) => {
 // GET a specific event by ID, including related sessions and calculating seatsAvailable
 router.get('/detail/:id', async (req, res) => {
   try {
-    // 使用 findById 查找特定賽事
     const event = await Event.findById(req.params.id)
       .populate({
         path: 'sessionList',
         populate: {
-          path: 'areaSetting.areaTicketType', // 確保嵌套填充 areaTicketType
-          select: 'ticketName ticketDiscount' // 選擇需要的欄位
+          path: 'areaSetting.areaTicketType',
+          select: 'ticketName ticketDiscount'
         }
       })
-      .populate('categoryId', 'nameTC nameEN photo') // 填充 categoryId 並選擇需要的欄位
-      .populate('tagList', 'name') // 填充 tagList 並選擇需要的欄位
+      .populate('categoryId', 'nameTC nameEN photo')
+      .populate('tagList', 'name')
       .exec();
 
-    // 如果未找到賽事，返回 404 錯誤
     if (!event) {
       return res.status(404).json({
         status: 'error',
@@ -176,24 +176,20 @@ router.get('/detail/:id', async (req, res) => {
     let totalSeatsAvailable = 0;
     let totalSeatsSold = 0;
 
-    // 更新每個 session 的狀態和是否完售屬性
     for (const session of event.sessionList) {
       const sessionStartTime = new Date(session.sessionSalesPeriod[0]);
       const sessionEndTime = new Date(session.sessionSalesPeriod[1]);
 
-      // 計算總座位數
-      const sessionTotalSeats = session.areaSetting.reduce((total, area) => total + area.areaNumber, 0);
-      session.seatsTotal = sessionTotalSeats;
+      // 直接從資料庫中獲取總座位數
+      const sessionTotalSeats = session.seatsTotal;
 
-      // 計算可用座位數
       const seatsAvailable = session.areaSetting.reduce((total, area) => total + area.areaNumber, 0);
       session.seatsAvailable = seatsAvailable;
       totalSeatsAvailable += seatsAvailable;
 
-      // 計算已售票數
       session.bookTicket = sessionTotalSeats - seatsAvailable;
+      totalSeatsSold += session.bookTicket;
 
-      // 計算已入場的票數
       const ticketsUsed = await Ticket.countDocuments({ sessionId: session._id, status: 1 });
       session.enterVenue = ticketsUsed;
 
@@ -203,20 +199,16 @@ router.get('/detail/:id', async (req, res) => {
       } else if (now >= sessionStartTime && now <= sessionEndTime) {
         session.sessionState = '開售中';
         session.isSoldOut = session.bookTicket >= sessionTotalSeats;
-        totalSeatsSold += session.bookTicket;
       } else {
         session.sessionState = '已結束';
         session.isSoldOut = session.bookTicket >= sessionTotalSeats;
-        totalSeatsSold += session.bookTicket;
       }
     }
 
-    // 將 event 轉換為 plain object 以便操作
     const eventObject = event.toObject();
     eventObject.seatsAvailable = totalSeatsAvailable;
     eventObject.isSoldOut = totalSeatsSold >= totalSeatsAvailable;
 
-    // 返回成功響應
     res.status(200).json({
       status: 'success',
       data: {
@@ -225,8 +217,6 @@ router.get('/detail/:id', async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching event", error);
-
-    // 返回 500 錯誤並包含錯誤信息
     res.status(500).json({
       status: 'error',
       message: 'Error fetching event',
@@ -234,6 +224,11 @@ router.get('/detail/:id', async (req, res) => {
     });
   }
 });
+
+
+
+
+
 
 
 

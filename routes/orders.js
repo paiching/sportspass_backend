@@ -6,8 +6,10 @@ const Order = require('../models/ordersModel');
 const  Event = require('../models/eventsModel'); // 確保正確引入 Event 模型
 const Sponsor = require('../models/usersModel');
 const Ticket = require('../models/ticketsModel');
+const { Session } = require('../models/sessionsModel');
 const verifyToken = require('../middlewares/verifyToken');
 const jwt = require('jsonwebtoken'); // 引入 jwt 模組
+
 
 // 提取 userID 的函數
 const getUserIdFromToken = (req) => {
@@ -16,7 +18,6 @@ const getUserIdFromToken = (req) => {
   return decoded.id;
 };
 
-// CREATE a new order
 router.post('/', verifyToken, async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -32,41 +33,11 @@ router.post('/', verifyToken, async (req, res) => {
     let ticketSales = 0;
     let salesTotal = 0;
 
-    for (const cartItem of cart) {
-      const { areaColor, areaName, ticketName, ticketDiscount, ticketNumber, price } = cartItem;
-
-      for (let i = 0; i < ticketNumber; i++) {
-        const ticket = new Ticket({
-          eventId,
-          sessionId,
-          areaColor,
-          areaName,
-          ticketName,
-          ticketDiscount,
-          price,
-          status: 0 // 初始狀態為未使用
-        });
-
-        try {
-          const savedTicket = await ticket.save({ session });
-          ticketIds.push(savedTicket._id);
-        } catch (ticketError) {
-          console.error("Error saving ticket:", ticketError);
-          throw ticketError;
-        }
-      }
-      
-      // 計算 ticketSales 和 salesTotal
-      ticketSales += ticketNumber;
-      salesTotal += price * ticketNumber;
-    }
-
     const newOrder = new Order({
       userId,
-      ticketId: ticketIds,
       ticketSales,
       salesTotal,
-      orderTotal: salesTotal,
+      orderTotal: 0, // 將在稍後更新
       totalAmount: total,
       status: 0, // 初始狀態為未付款
       createdAt: new Date(),
@@ -80,13 +51,104 @@ router.post('/', verifyToken, async (req, res) => {
       throw orderError;
     }
 
-    try {
-      const updatedEvent = await Event.findByIdAndUpdate(eventId, { $push: { orderId: newOrder._id } });
-      if (!updatedEvent) {
-        throw new Error(`Event with ID ${eventId} not found`);
+    for (const cartItem of cart) {
+      const { areaColor, areaName, ticketName, ticketDiscount, ticketNumber, price } = cartItem;
+
+      for (let i = 0; i < ticketNumber; i++) {
+        const ticket = new Ticket({
+          eventId,
+          sessionId,
+          areaColor,
+          areaName,
+          ticketName,
+          ticketDiscount,
+          price,
+          status: 0, // 初始狀態為未使用
+          orderId: newOrder._id
+        });
+
+        try {
+          const savedTicket = await ticket.save({ session });
+          ticketIds.push(savedTicket._id);
+        } catch (ticketError) {
+          console.error("Error saving ticket:", ticketError);
+          throw ticketError;
+        }
       }
+
+      ticketSales += ticketNumber;
+      salesTotal += price * ticketNumber;
+    }
+
+    newOrder.ticketId = ticketIds;
+    newOrder.ticketSales = ticketSales;
+    newOrder.salesTotal = salesTotal;
+    newOrder.orderTotal = salesTotal;
+
+    try {
+      await newOrder.save({ session });
+    } catch (orderError) {
+      console.error("Error updating order:", orderError);
+      throw orderError;
+    }
+
+    const sessionToUpdate = await Session.findById(sessionId).exec();
+
+    if (!sessionToUpdate) {
+      throw new Error(`Session with ID ${sessionId} not found`);
+    }
+
+    for (const cartItem of cart) {
+      const { areaName, ticketNumber } = cartItem;
+
+      const areaToUpdate = sessionToUpdate.areaSetting.find(
+        (area) => area.areaName === areaName
+      );
+
+      if (!areaToUpdate) {
+        throw new Error(`Area with name ${areaName} not found in session ${sessionId}`);
+      }
+
+      areaToUpdate.areaNumber -= ticketNumber;
+
+      if (areaToUpdate.areaNumber < 0) {
+        throw new Error(`Insufficient seats available in area ${areaName}`);
+      }
+    }
+
+    const seatsAvailable = sessionToUpdate.areaSetting.reduce((total, area) => total + area.areaNumber, 0);
+    const seatsTotal = sessionToUpdate.areaSetting.reduce((total, area) => total + (area.areaNumberInitial || area.areaNumber), 0);
+
+    sessionToUpdate.bookTicket = seatsTotal - seatsAvailable;
+    sessionToUpdate.seatsAvailable = seatsAvailable;
+    sessionToUpdate.isSoldOut = seatsAvailable <= 0;
+
+    try {
+      await Session.findByIdAndUpdate(sessionId, {
+        areaSetting: sessionToUpdate.areaSetting,
+        bookTicket: sessionToUpdate.bookTicket,
+        seatsAvailable: sessionToUpdate.seatsAvailable,
+        isSoldOut: sessionToUpdate.isSoldOut
+      }, { session });
+    } catch (sessionUpdateError) {
+      console.error("Error updating session with new order data:", sessionUpdateError);
+      throw sessionUpdateError;
+    }
+
+    const updatedEvent = await Event.findById(eventId).exec();
+    if (!updatedEvent) {
+      throw new Error(`Event with ID ${eventId} not found`);
+    }
+
+    const seatsAvailableInEvent = updatedEvent.sessionList.reduce((total, session) => total + session.seatsAvailable, 0);
+    const seatsTotalInEvent = updatedEvent.sessionList.reduce((total, session) => total + session.seatsTotal, 0);
+
+    updatedEvent.isSoldOut = seatsAvailableInEvent <= 0;
+
+    try {
+      await updatedEvent.save({ session });
     } catch (eventUpdateError) {
-      console.error("Error updating event with new order ID:", eventUpdateError);
+      console.error("Error updating event with new order data:", eventUpdateError);
       throw eventUpdateError;
     }
 
@@ -106,6 +168,9 @@ router.post('/', verifyToken, async (req, res) => {
     res.status(500).send(`Error creating order: ${error.message}`);
   }
 });
+
+
+
 
 // READ all orders
 router.get('/list', async (req, res) => {
