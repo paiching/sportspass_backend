@@ -171,12 +171,27 @@ router.get('/detail/:id', async (req, res) => {
       });
     }
 
-    // 計算所有 areaNumber 的總和
+    const now = new Date();
     let totalSeatsAvailable = 0;
+
+    // 更新每個 session 的狀態和是否完售屬性
     event.sessionList.forEach(session => {
-      session.areaSetting.forEach(area => {
-        totalSeatsAvailable += area.areaNumber;
-      });
+      const sessionStartTime = new Date(session.sessionSalesPeriod[0]);
+      const sessionEndTime = new Date(session.sessionSalesPeriod[1]);
+
+      if (now < sessionStartTime) {
+        session.sessionState = '尚未開始';
+        session.openTime = session.sessionSalesPeriod[0];
+      } else if (now >= sessionStartTime && now <= sessionEndTime) {
+        session.sessionState = '開售中';
+        const seatsSold = session.areaSetting.reduce((total, area) => total + area.areaNumber, 0);
+        session.isSoldOut = seatsSold >= totalSeatsAvailable;
+      } else {
+        session.sessionState = '已結束';
+      }
+
+      // 計算總座位數
+      totalSeatsAvailable += session.areaSetting.reduce((total, area) => total + area.areaNumber, 0);
     });
 
     // 將 event 轉換為 plain object 以便操作
@@ -334,35 +349,27 @@ router.get('/filter/:displayMode', async (req, res) => {
   const displayMode = req.params.displayMode;
   const { nameTC, limit, p, q } = req.query;
 
-  // Validate required query parameters
-  if (!nameTC || !limit) {
-    return res.status(400).json({
-      status: 'error',
-      message: 'nameTC and limit are required query parameters'
-    });
-  }
-
-  const limitNum = parseInt(limit, 10);
+  const limitNum = limit ? parseInt(limit, 10) : 0; // 默認值為0，表示無限制
   const pageNum = p ? parseInt(p, 10) : 1;
   const skip = (pageNum - 1) * limitNum;
 
   try {
     const now = new Date();
 
-    // Find the category by nameTC
-    const category = await Category.findOne({ nameTC });
-    if (!category) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Category not found'
-      });
+    let match = {};
+    if (nameTC) {
+      // Find the category by nameTC
+      const category = await Category.findOne({ nameTC });
+      if (!category) {
+        return res.status(404).json({
+          status: 'error',
+          message: 'Category not found'
+        });
+      }
+      match.categoryId = category._id;
     }
 
-    const match = {
-      categoryId: category._id
-    };
-
-    // Initial match for categoryId
+    // Initial match for categoryId if nameTC is provided
     const pipeline = [
       { $match: match },
       {
@@ -427,9 +434,14 @@ router.get('/filter/:displayMode', async (req, res) => {
         });
     }
 
+    if (limitNum > 0) {
+      pipeline.push(
+        { $skip: skip },
+        { $limit: limitNum }
+      );
+    }
+
     pipeline.push(
-      { $skip: skip },
-      { $limit: limitNum },
       {
         $lookup: {
           from: 'categories',
@@ -462,6 +474,7 @@ router.get('/filter/:displayMode', async (req, res) => {
     res.status(500).send("Error fetching events");
   }
 });
+
 
 // GET events listing with pagination based on sponsorId
 router.get('/sponsor/:id', async (req, res) => {
