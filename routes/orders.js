@@ -116,7 +116,7 @@ router.get('/list', async (req, res) => {
         {
           path: 'eventId',
           model: 'Event', // Model name of the event
-          select: 'eventName eventPic' // Specify the fields you want to include from the Event model
+          select: 'eventId eventName eventPic' // Specify the fields you want to include from the Event model
         },
         {
           path: 'sessionId',
