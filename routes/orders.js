@@ -32,12 +32,15 @@ router.post('/', verifyToken, async (req, res) => {
     const ticketIds = [];
     let ticketSales = 0;
     let salesTotal = 0;
+    const seats = [];
+    let seatCounter = 1;
 
     const newOrder = new Order({
       userId,
       ticketSales,
       salesTotal,
       orderTotal: 0, // 將在稍後更新
+      seats, // 初始化 seats
       totalAmount: total,
       status: 0, // 初始狀態為未付款
       createdAt: new Date(),
@@ -55,21 +58,24 @@ router.post('/', verifyToken, async (req, res) => {
       const { areaColor, areaName, ticketName, ticketDiscount, ticketNumber, price } = cartItem;
 
       for (let i = 0; i < ticketNumber; i++) {
+        const seatNumber = `${areaName}${seatCounter++}`;
         const ticket = new Ticket({
+          orderId: newOrder._id,
           eventId,
           sessionId,
           areaColor,
           areaName,
           ticketName,
           ticketDiscount,
+          seatNumber,
           price,
-          status: 0, // 初始狀態為未使用
-          orderId: newOrder._id
+          status: 0 // 初始狀態為未使用
         });
 
         try {
           const savedTicket = await ticket.save({ session });
           ticketIds.push(savedTicket._id);
+          seats.push(seatNumber); // 添加 seatNumber 到 seats 數組中
         } catch (ticketError) {
           console.error("Error saving ticket:", ticketError);
           throw ticketError;
@@ -84,6 +90,7 @@ router.post('/', verifyToken, async (req, res) => {
     newOrder.ticketSales = ticketSales;
     newOrder.salesTotal = salesTotal;
     newOrder.orderTotal = salesTotal;
+    newOrder.seats = seats; // 更新 seats 信息
 
     try {
       await newOrder.save({ session });
@@ -117,7 +124,7 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     const seatsAvailable = sessionToUpdate.areaSetting.reduce((total, area) => total + area.areaNumber, 0);
-    const seatsTotal = sessionToUpdate.areaSetting.reduce((total, area) => total + (area.areaNumberInitial || area.areaNumber), 0);
+    const seatsTotal = sessionToUpdate.seatsTotal;
 
     sessionToUpdate.bookTicket = seatsTotal - seatsAvailable;
     sessionToUpdate.seatsAvailable = seatsAvailable;
@@ -172,6 +179,8 @@ router.post('/', verifyToken, async (req, res) => {
 
 
 
+
+
 // READ all orders
 router.get('/list', async (req, res) => {
   try {
@@ -181,7 +190,7 @@ router.get('/list', async (req, res) => {
         {
           path: 'eventId',
           model: 'Event', // Model name of the event
-          select: 'eventId eventName eventPic' // Specify the fields you want to include from the Event model
+          select: 'eventName eventPic' // Specify the fields you want to include from the Event model
         },
         {
           path: 'sessionId',
@@ -208,7 +217,8 @@ router.get('/list', async (req, res) => {
           eventPic: eventDetails.eventPic || '',
           sessionTime: sessionDetails.sessionTime || 'Unknown Time',
           sessionName: sessionDetails.sessionName || 'Unknown Session',
-          sessionPlace: sessionDetails.sessionPlace || 'Unknown Place'
+          sessionPlace: sessionDetails.sessionPlace || 'Unknown Place',
+          seats: `${ticket.areaName}${ticket.seatNumber}`
         };
       });
       delete orderObject.ticketId;
@@ -227,12 +237,11 @@ router.get('/list', async (req, res) => {
   }
 });
 
-module.exports = router;
 
 // READ a specific order by ID
 router.get('/:id', async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id).populate('eventId sessionId userId ticketId sponsorId salesList');
+    const order = await Order.findById(req.params.id).populate('ticketId');
     if (!order) {
       return res.status(404).json({
         status: 'error',

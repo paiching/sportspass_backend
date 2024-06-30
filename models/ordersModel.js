@@ -1,11 +1,6 @@
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
-const seatSchema = new Schema({
-    seatNumber: { type: Number, required: true },
-    isBooked: { type: Boolean, default: false }
-});
-
 
 const orderSchema = new Schema({
 
@@ -14,6 +9,7 @@ const orderSchema = new Schema({
     ticketSales: { type: Number },
     salesTotal: { type: Number },
     orderTotal: { type: Number },
+    seats: [{ type:String }],
     totalAmount: { type: Number, required: true },
     status: { type: Number, required: true, enum: [0, 1, 2], default: 0 }, // 0: 未付款, 1: 已付款 
     createdAt: { type: Date, default: Date.now },

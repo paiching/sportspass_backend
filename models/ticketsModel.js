@@ -10,6 +10,7 @@ const ticketSchema = new Schema({
   ticketDiscount: { type: String, required: true },
   areaColor: { type: String, required: true },
   areaName: { type: String, required: true },
+  seatNumber: {type: String, required: true},
   price: { type: String, required: true },
   status: { type: Number, required: true, enum: [0, 1, 2], default: 0 }, // 0: 未使用, 1: 已使用, 2: 退票
   unTicketReason: { type: String },
