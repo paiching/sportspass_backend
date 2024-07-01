@@ -39,7 +39,7 @@ router.post('/ecpay-return', async (req, res) => {
       if (data.RtnCode === '1') {
           const orderID = data.CustomField1;
           // 交易成功，更新訂單狀態
-          await updateOrderStatus(orderID, 'paid');
+          await updateOrderStatus(orderID, 1);
           res.status(200).send('OK');
       } else {
           // 交易失敗，處理失敗邏輯
