@@ -19,7 +19,7 @@ router.get('/', (req, res) => {
   `);
 });
 
-router.get('/checkout', (req, res) => {
+router.post('/checkout', (req, res) => {
 
     const { itemName, itemPrice } = req.body;
 
@@ -84,9 +84,10 @@ router.get('/checkout', (req, res) => {
 
       create = new ecpay_payment(options),
       htm = create.payment_client.aio_check_out_all(parameters = base_param, invoice = inv_params)
-      console.log(htm)
+      console.log(htm);
 
-      res.render('checkout',{title: 'Express', checkoutForm: htm});
+      // res.render('checkout',{title: 'Express', checkoutForm: htm});
+      res.send(htm);
   });
 
 
