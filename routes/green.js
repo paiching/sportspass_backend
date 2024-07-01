@@ -20,15 +20,21 @@ router.get('/', (req, res) => {
 });
 
 router.get('/checkout', (req, res) => {
+
+    const { itemName, itemPrice } = req.body;
+
+    if (!itemName || !itemPrice) {
+        return res.status(400).json({ error: 'Item name and price are required' });
+    }
     
     const MerchantTradeNo = generateUUID();
 
     const base_param = {
         MerchantTradeNo: MerchantTradeNo, //請帶20碼uid, ex: f0a0d7e9fae1bb72bc93
         MerchantTradeDate: moment().format('YYYY/MM/DD HH:mm:ss'), 
-        TotalAmount: '100',
+        TotalAmount: itemPrice,
         TradeDesc: '測試交易描述',
-        ItemName: '測試商品等',
+        ItemName: itemName,
         ReturnURL: 'http://192.168.0.1',
       }
 
