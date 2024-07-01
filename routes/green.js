@@ -72,7 +72,7 @@ router.post('/checkout', (req, res) => {
       return res.status(400).json({ error: 'Item name, price, and order ID are required' });
   }
   
-  const MerchantTradeNo = `${generateUUID()}-${orderID}`;
+  const MerchantTradeNo = generateUUID();
 
   const base_param = {
       MerchantTradeNo: MerchantTradeNo, // 包含 orderID
