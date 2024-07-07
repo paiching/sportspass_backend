@@ -308,7 +308,6 @@ router.delete('/:id', async (req, res) => {
 
 // GET events listing with pagination and category filter
 router.get('/list', async (req, res) => {
-
   try {
     const { page = 1, pageSize = 10, categoryId } = req.query;
     const skip = (page - 1) * pageSize;
@@ -316,8 +315,6 @@ router.get('/list', async (req, res) => {
 
     // Validate categoryId if provided
     const filter = {};
-
-    console.log(categoryId);
     if (categoryId) {
       if (!mongoose.Types.ObjectId.isValid(categoryId)) {
         return res.status(400).json({
@@ -334,18 +331,49 @@ router.get('/list', async (req, res) => {
         .skip(skip)
         .limit(limit)
         .populate('categoryId')
-        // .populate('sessionList')
-        // .populate('tagList')
+        .populate('sessionList')
+        .populate('tagList')
         .exec(),
       Event.countDocuments(filter)
     ]);
 
     const totalPages = Math.ceil(totalItems / pageSize);
 
+    // Process each event to include the new fields
+    const eventsWithDetails = events.map(event => {
+      let eventPlace = '';
+      let minPrice = Infinity;
+      let ticketSales = 0;
+
+      event.sessionList.forEach(session => {
+        // Update eventPlace with the place of the earliest session
+        if (!eventPlace || new Date(session.sessionTime) < new Date(eventPlace.sessionTime)) {
+          eventPlace = session.sessionPlace;
+        }
+
+        // Find the minimum areaPrice
+        session.areaSetting.forEach(area => {
+          if (area.areaPrice < minPrice) {
+            minPrice = area.areaPrice;
+          }
+          // Add up the ticket sales
+          ticketSales += area.areaNumber - session.seatsAvailable;
+        });
+      });
+
+      return {
+        ...event.toObject(),
+        eventPlace,
+        price: minPrice === Infinity ? 0 : minPrice,
+        ticketSales,
+        tagList: Array.isArray(event.tagList) ? event.tagList : [event.tagList]
+      };
+    });
+
     res.status(200).json({
       status: 'success',
       data: {
-        events,
+        events: eventsWithDetails,
         pagination: {
           totalItems,
           totalPages,
@@ -359,6 +387,7 @@ router.get('/list', async (req, res) => {
     res.status(500).send("Error fetching events");
   }
 });
+
 
 // GET events listing with filter by category nameTC
 router.get('/filter/:displayMode', async (req, res) => {
