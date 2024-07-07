@@ -59,7 +59,7 @@ app.use('/api/v1/notification', notificationsRouter);
 app.use('/api/v1/subscription', subscriptionsRouter);
 app.use('/api/v1/order', ordersRouter);
 app.use('/order', ordersRouter);
-app.use('/green', greensRouter);
+app.use('/api/v1/green', greensRouter);
 app.use('/api/v1/categories', categoriesRouter);
 app.use('/api/v1/upload', uploadRouter);
 
