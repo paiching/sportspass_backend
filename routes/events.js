@@ -477,12 +477,43 @@ router.get('/filter/:displayMode', async (req, res) => {
 
     const events = await Event.aggregate(pipeline);
 
-    console.log('Events found:', events.length); // Debug output to check the number of events found
+    // Process each event to include the new fields
+    const eventsWithDetails = events.map(event => {
+      let eventPlace = '';
+      let minPrice = Infinity;
+      let ticketSales = 0;
+
+      event.sessionList.forEach(session => {
+        // Update eventPlace with the place of the earliest session
+        if (!eventPlace || new Date(session.sessionTime) < new Date(eventPlace.sessionTime)) {
+          eventPlace = session.sessionPlace;
+        }
+
+        // Find the minimum areaPrice
+        session.areaSetting.forEach(area => {
+          if (area.areaPrice < minPrice) {
+            minPrice = area.areaPrice;
+          }
+          // Add up the ticket sales
+          ticketSales += area.areaNumber - session.seatsAvailable;
+        });
+      });
+
+      return {
+        ...event,
+        eventPlace,
+        price: minPrice === Infinity ? 0 : minPrice,
+        ticketSales,
+        tagList: Array.isArray(event.tagList) ? event.tagList : [event.tagList]
+      };
+    });
+
+    console.log('Events found:', eventsWithDetails.length); // Debug output to check the number of events found
 
     res.status(200).json({
       status: 'success',
       data: {
-        events
+        events: eventsWithDetails
       }
     });
   } catch (error) {
@@ -490,6 +521,7 @@ router.get('/filter/:displayMode', async (req, res) => {
     res.status(500).send("Error fetching events");
   }
 });
+
 
 
 // GET events listing with pagination based on sponsorId
