@@ -5,7 +5,53 @@ const axios = require('axios');
 const moment = require('moment');
 const qs = require('qs');
 const ecpay_payment = require('ecpay_aio_nodejs');
+const Order = require('../models/ordersModel'); 
 require('dotenv').config(); 
+
+
+function verifyCheckMacValue(data) {
+  const { ECPAY_HASH_KEY, ECPAY_HASH_IV } = process.env;
+  let raw = `HashKey=${ECPAY_HASH_KEY}&${Object.keys(data).sort().map(key => `${key}=${data[key]}`).join('&')}&HashIV=${ECPAY_HASH_IV}`;
+  raw = encodeURIComponent(raw).toLowerCase().replace(/%20/g, '+').replace(/%2d/g, '-').replace(/%5f/g, '_').replace(/%2e/g, '.').replace(/%2a/g, '*');
+  const hash = crypto.createHash('md5').update(raw).digest('hex').toUpperCase();
+  return hash === data.CheckMacValue;
+}
+
+async function updateOrderStatus(orderID, status) {
+  try {
+      const order = await Order.findOne({ orderID });
+      if (!order) {
+          console.error(`Order with ID ${orderID} not found`);
+          return;
+      }
+      order.status = status;
+      await order.save();
+      console.log(`Order with ID ${orderID} has been updated to status ${status}`);
+  } catch (error) {
+      console.error(`Error updating order status: ${error}`);
+  }
+}
+
+router.post('/ecpay-return', async (req, res) => {
+  const data = req.body;
+
+  if (verifyCheckMacValue(data)) {
+      if (data.RtnCode === '1') {
+          const orderID = data.CustomField1;
+          // 交易成功，更新訂單狀態
+          await updateOrderStatus(orderID, 1);
+          res.status(200).send('OK');
+      } else {
+          // 交易失敗，處理失敗邏輯
+          res.status(400).send('Transaction Failed');
+      }
+  } else {
+      // 檢查碼驗證失敗
+      res.status(400).send('CheckMacValue Verification Failed');
+  }
+});
+
+
 
 router.get('/', (req, res) => {
   res.send(`
@@ -19,69 +65,77 @@ router.get('/', (req, res) => {
   `);
 });
 
-router.get('/checkout', (req, res) => {
-    
-    const MerchantTradeNo = generateUUID();
+router.post('/checkout', (req, res) => {
+  const { itemName, itemPrice, orderID } = req.body;
 
-    const base_param = {
-        MerchantTradeNo: MerchantTradeNo, //請帶20碼uid, ex: f0a0d7e9fae1bb72bc93
-        MerchantTradeDate: moment().format('YYYY/MM/DD HH:mm:ss'), 
-        TotalAmount: '100',
-        TradeDesc: '測試交易描述',
-        ItemName: '測試商品等',
-        ReturnURL: 'http://192.168.0.1',
-      }
+  if (!itemName || !itemPrice || !orderID) {
+      return res.status(400).json({ error: 'Item name, price, and order ID are required' });
+  }
+  
+  const MerchantTradeNo = generateUUID();
 
-      const options = {
-        "OperationMode": "Test", //Test or Production
-        "MercProfile": {
+  const base_param = {
+      MerchantTradeNo: MerchantTradeNo, // 包含 orderID
+      MerchantTradeDate: moment().format('YYYY/MM/DD HH:mm:ss'), 
+      TotalAmount: itemPrice,
+      TradeDesc: '測試交易描述',
+      ItemName: itemName,
+      ReturnURL: 'https://sportspass-api-server.onrender.com/ecpay-return',
+      CustomField1: orderID
+  };
+
+  const options = {
+      "OperationMode": "Test", //Test or Production
+      "MercProfile": {
           "MerchantID": process.env.ECPAY_MERCHANT_ID,
           "HashKey": process.env.ECPAY_HASH_KEY,
           "HashIV": process.env.ECPAY_HASH_IV
-        },
-        "IgnorePayment": [
-      //    "Credit",
-      //    "WebATM",
-      //    "ATM",
-      //    "CVS",
-      //    "BARCODE",
-      //    "AndroidPay"
-        ],
-        "IsProjectContractor": false
-      }
-      let inv_params = {
-        // RelateNumber: 'PLEASE MODIFY',  //請帶30碼uid ex: SJDFJGH24FJIL97G73653XM0VOMS4K
-        // CustomerID: 'MEM_0000001',  //會員編號
-        // CustomerIdentifier: '',   //統一編號
-        // CustomerName: '測試買家',
-        // CustomerAddr: '測試用地址',
-        // CustomerPhone: '0123456789',
-        // CustomerEmail: 'johndoe@test.com',
-        // ClearanceMark: '2',
-        // TaxType: '1',
-        // CarruerType: '',
-        // CarruerNum: '',
-        // Donation: '2',
-        // LoveCode: '',
-        // Print: '1',
-        // InvoiceItemName: '測試商品1|測試商品2',
-        // InvoiceItemCount: '2|3',
-        // InvoiceItemWord: '個|包',
-        // InvoiceItemPrice: '35|10',
-        // InvoiceItemTaxType: '1|1',
-        // InvoiceRemark: '測試商品1的說明|測試商品2的說明',
-        // DelayDay: '0',
-        // InvType: '07'
-      }
-      
-      console.log('options:', options);
+      },
+      "IgnorePayment": [
+          // "Credit",
+          // "WebATM",
+          // "ATM",
+          // "CVS",
+          // "BARCODE",
+          // "AndroidPay"
+      ],
+      "IsProjectContractor": false
+  };
 
-      create = new ecpay_payment(options),
-      htm = create.payment_client.aio_check_out_all(parameters = base_param, invoice = inv_params)
-      console.log(htm)
+  let inv_params = {
+      // RelateNumber: 'PLEASE MODIFY',  //請帶30碼uid ex: SJDFJGH24FJIL97G73653XM0VOMS4K
+      // CustomerID: 'MEM_0000001',  //會員編號
+      // CustomerIdentifier: '',   //統一編號
+      // CustomerName: '測試買家',
+      // CustomerAddr: '測試用地址',
+      // CustomerPhone: '0123456789',
+      // CustomerEmail: 'johndoe@test.com',
+      // ClearanceMark: '2',
+      // TaxType: '1',
+      // CarruerType: '',
+      // CarruerNum: '',
+      // Donation: '2',
+      // LoveCode: '',
+      // Print: '1',
+      // InvoiceItemName: '測試商品1|測試商品2',
+      // InvoiceItemCount: '2|3',
+      // InvoiceItemWord: '個|包',
+      // InvoiceItemPrice: '35|10',
+      // InvoiceItemTaxType: '1|1',
+      // InvoiceRemark: '測試商品1的說明|測試商品2的說明',
+      // DelayDay: '0',
+      // InvType: '07'
+  };
 
-      res.render('checkout',{title: 'Express', checkoutForm: htm});
-  });
+  console.log('options:', options);
+
+  const create = new ecpay_payment(options);
+  const htm = create.payment_client.aio_check_out_all(parameters = base_param, invoice = inv_params);
+  console.log(htm);
+
+  res.send(htm);
+});
+
 
 
 function generateUUID() {
