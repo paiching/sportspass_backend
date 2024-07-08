@@ -499,6 +499,14 @@ router.get('/filter/:displayMode', async (req, res) => {
         $addFields: {
           categoryId: { $arrayElemAt: ['$categoryId', 0] }
         }
+      },
+      {
+        $lookup: {
+          from: 'sessions',
+          localField: 'sessionList',
+          foreignField: '_id',
+          as: 'sessionList'
+        }
       }
     );
 
@@ -512,21 +520,21 @@ router.get('/filter/:displayMode', async (req, res) => {
       let minPrice = Infinity;
       let ticketSales = 0;
 
-      event.sessionList.forEach(session => {
-        // Update eventPlace with the place of the earliest session
-        if (!eventPlace || new Date(session.sessionTime) < new Date(eventPlace.sessionTime)) {
-          eventPlace = session.sessionPlace;
-        }
-
-        // Find the minimum areaPrice
-        session.areaSetting.forEach(area => {
-          if (area.areaPrice < minPrice) {
-            minPrice = area.areaPrice;
+      if (event.sessionList) {
+        event.sessionList.forEach(session => {
+          // Update eventPlace with the place of the earliest session
+          if (!eventPlace || new Date(session.sessionTime) < new Date(eventPlace.sessionTime)) {
+            eventPlace = session.sessionPlace;
           }
-          // Add up the ticket sales
-          ticketSales += area.areaNumber - session.seatsAvailable;
+
+          // Find the minimum areaPrice
+          if (session.bookTicket) {
+              // Add up the ticket sales
+              ticketSales += session.bookTicket;
+          
+          }
         });
-      });
+      }
 
       return {
         ...event,
@@ -550,6 +558,7 @@ router.get('/filter/:displayMode', async (req, res) => {
     res.status(500).send("Error fetching events");
   }
 });
+
 
 
 
