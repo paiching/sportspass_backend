@@ -159,6 +159,16 @@ router.post('/', verifyToken, async (req, res) => {
       throw eventUpdateError;
     }
 
+    // 更新用戶的訂單列表
+    try {
+      await User.findByIdAndUpdate(userId, {
+        $push: { orders: newOrder._id }
+      }, { session });
+    } catch (userUpdateError) {
+      console.error("Error updating user with new order data:", userUpdateError);
+      throw userUpdateError;
+    }
+
     await session.commitTransaction();
     session.endSession();
 
