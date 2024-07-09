@@ -424,8 +424,7 @@ router.get('/filter/:displayMode', async (req, res) => {
           foreignField: '_id',
           as: 'tagList'
         }
-      },
-      { $unwind: '$tagList' }
+      }
     ];
 
     // Additional match for search query
@@ -518,7 +517,8 @@ router.get('/filter/:displayMode', async (req, res) => {
     const eventsWithDetails = events.map(event => {
       let eventPlace = '';
       let minPrice = Infinity;
-      let ticketSales = 0;
+      let totalSeats = 0;
+      let availableSeats = 0;
 
       if (event.sessionList) {
         event.sessionList.forEach(session => {
@@ -527,14 +527,19 @@ router.get('/filter/:displayMode', async (req, res) => {
             eventPlace = session.sessionPlace;
           }
 
-          // Find the minimum areaPrice
-          if (session.bookTicket) {
-              // Add up the ticket sales
-              ticketSales += session.bookTicket;
-          
-          }
+          // Find the minimum areaPrice and calculate total seats and available seats
+          session.areaSetting.forEach(area => {
+            if (area.areaPrice < minPrice) {
+              minPrice = area.areaPrice;
+            }
+          });
+
+          totalSeats += session.seatsTotal;
+          availableSeats += session.seatsAvailable;
         });
       }
+
+      const ticketSales = totalSeats - availableSeats;
 
       return {
         ...event,
@@ -558,8 +563,6 @@ router.get('/filter/:displayMode', async (req, res) => {
     res.status(500).send("Error fetching events");
   }
 });
-
-
 
 
 // GET events listing with pagination based on sponsorId
