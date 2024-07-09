@@ -424,6 +424,14 @@ router.get('/filter/:displayMode', async (req, res) => {
           foreignField: '_id',
           as: 'tagList'
         }
+      },
+      {
+        $lookup: {
+          from: 'sessions',
+          localField: 'sessionList',
+          foreignField: '_id',
+          as: 'sessionList'
+        }
       }
     ];
 
@@ -461,8 +469,8 @@ router.get('/filter/:displayMode', async (req, res) => {
         pipeline.push({
           $match: {
             'sessionList.sessionTime': {
-              $gte: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
-              $lte: now
+              $gte: new Date(now.getTime()), 
+              $lte: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000) 
             }
           }
         });
@@ -497,14 +505,6 @@ router.get('/filter/:displayMode', async (req, res) => {
       {
         $addFields: {
           categoryId: { $arrayElemAt: ['$categoryId', 0] }
-        }
-      },
-      {
-        $lookup: {
-          from: 'sessions',
-          localField: 'sessionList',
-          foreignField: '_id',
-          as: 'sessionList'
         }
       }
     );
@@ -563,6 +563,7 @@ router.get('/filter/:displayMode', async (req, res) => {
     res.status(500).send("Error fetching events");
   }
 });
+
 
 
 
