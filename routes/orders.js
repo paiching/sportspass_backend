@@ -177,10 +177,6 @@ router.post('/', verifyToken, async (req, res) => {
 });
 
 
-
-
-
-
 // READ all orders
 router.get('/list', async (req, res) => {
   try {

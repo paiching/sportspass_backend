@@ -132,7 +132,7 @@ router.post('/checkout', (req, res) => {
   const create = new ecpay_payment(options);
   const htm = create.payment_client.aio_check_out_all(parameters = base_param, invoice = inv_params);
   console.log(htm);
-
+  //res.render('checkout',{title: 'Express', checkoutForm: htm});
   res.send(htm);
 });
 

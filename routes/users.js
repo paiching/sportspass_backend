@@ -42,6 +42,7 @@ router.get('/list', verifyToken, async (req, res) => {
   }
 });
 
+// GET user profile with orders
 router.get('/profile/:id', verifyToken, async (req, res, next) => {
   const userId = req.params.id;
 
@@ -49,9 +50,31 @@ router.get('/profile/:id', verifyToken, async (req, res, next) => {
     const user = await User.findById(userId, '-password')
       .populate({
         path: 'subscribes',
-        model: Subscription
+        model: Subscription,
+        populate: [
+          { path: 'sponsor', select: 'name' },
+          { path: 'tag', select: 'name' }
+        ]
       })
-      .populate('focusedEvents');
+      .populate('focusedEvents')
+      .populate({
+        path: 'orders',
+        populate: {
+          path: 'ticketId',
+          populate: [
+            {
+              path: 'eventId',
+              model: 'Event', // Model name of the event
+              select: 'eventName eventPic' // Specify the fields you want to include from the Event model
+            },
+            {
+              path: 'sessionId',
+              model: 'Session', // Model name of the session
+              select: 'sessionName sessionTime sessionPlace' // Specify the fields you want to include from the Session model
+            }
+          ]
+        }
+      });
 
     if (!user) {
       return res.status(404).json({
@@ -96,12 +119,37 @@ router.get('/profile/:id', verifyToken, async (req, res, next) => {
       };
     }));
 
+    const ordersWithModifiedFields = user.orders.map(order => {
+      const orderObject = order.toObject();
+      orderObject.ticketList = orderObject.ticketId.map(ticket => {
+        const eventDetails = ticket.eventId || {}; // Ensure eventDetails is not null
+        const sessionDetails = ticket.sessionId || {}; // Ensure sessionDetails is not null
+
+        return {
+          ...ticket,
+          eventDetails,
+          sessionDetails,
+          eventId: undefined,
+          sessionId: undefined,
+          eventName: eventDetails.eventName || 'Unknown Event',
+          eventPic: eventDetails.eventPic || '',
+          sessionTime: sessionDetails.sessionTime || 'Unknown Time',
+          sessionName: sessionDetails.sessionName || 'Unknown Session',
+          sessionPlace: sessionDetails.sessionPlace || 'Unknown Place',
+          seats: `${ticket.areaName}${ticket.seatNumber}`
+        };
+      });
+      delete orderObject.ticketId;
+      return orderObject;
+    });
+
     res.status(200).json({
       status: 'success',
       data: {
         user: {
           ...user.toObject(),
-          focusedEvents
+          focusedEvents,
+          orders: ordersWithModifiedFields // Include orders with detailed information
         }
       }
     });
@@ -113,6 +161,8 @@ router.get('/profile/:id', verifyToken, async (req, res, next) => {
     });
   }
 });
+
+
 
 router.post('/register', async (req, res, next) => {
   const { account, password, email, phone, role } = req.body;
