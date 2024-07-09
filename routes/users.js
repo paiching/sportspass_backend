@@ -492,7 +492,7 @@ router.get('/:userId/order', verifyToken, async (req, res) => {
         {
           path: 'eventId',
           model: 'Event', // Model name of the event
-          select: 'eventName' // Specify the fields you want to include from the Event model
+          select: 'eventName eventPic' // Specify the fields you want to include from the Event model
         },
         {
           path: 'sessionId',
@@ -513,12 +513,21 @@ router.get('/:userId/order', verifyToken, async (req, res) => {
     const ordersWithModifiedFields = orders.map(order => {
       const orderObject = order.toObject();
       orderObject.ticketList = orderObject.ticketId.map(ticket => {
+        const eventDetails = ticket.eventId || {}; // Ensure eventDetails is not null
+        const sessionDetails = ticket.sessionId || {}; // Ensure sessionDetails is not null
+
         return {
           ...ticket,
-          eventDetails: ticket.eventId,
-          sessionDetails: ticket.sessionId,
+          eventDetails,
+          sessionDetails,
           eventId: undefined,
-          sessionId: undefined
+          sessionId: undefined,
+          eventName: eventDetails.eventName || 'Unknown Event',
+          eventPic: eventDetails.eventPic || '',
+          sessionTime: sessionDetails.sessionTime || 'Unknown Time',
+          sessionName: sessionDetails.sessionName || 'Unknown Session',
+          sessionPlace: sessionDetails.sessionPlace || 'Unknown Place',
+          seats: `${ticket.areaName}${ticket.seatNumber}`
         };
       });
       delete orderObject.ticketId;
@@ -536,6 +545,7 @@ router.get('/:userId/order', verifyToken, async (req, res) => {
     res.status(500).send("Error fetching orders by userId");
   }
 });
+
 
 
 module.exports = router;
