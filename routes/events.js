@@ -392,7 +392,7 @@ router.get('/list', async (req, res) => {
 // GET events listing with filter by category nameTC
 router.get('/filter/:displayMode', async (req, res) => {
   const displayMode = req.params.displayMode;
-  const { nameTC, limit, p, q } = req.query;
+  const { nameTC, limit, p, q, status = 1 } = req.query;
 
   const limitNum = limit ? parseInt(limit, 10) : 0; // 默認值為0，表示無限制
   const pageNum = p ? parseInt(p, 10) : 1;
@@ -401,7 +401,7 @@ router.get('/filter/:displayMode', async (req, res) => {
   try {
     const now = new Date();
 
-    let match = {};
+    let match = { status: parseInt(status, 10) }; // 預設為1，或使用傳遞的status
     if (nameTC) {
       // Find the category by nameTC
       const category = await Category.findOne({ nameTC });
@@ -563,6 +563,7 @@ router.get('/filter/:displayMode', async (req, res) => {
     res.status(500).send("Error fetching events");
   }
 });
+
 
 
 // GET events listing with pagination based on sponsorId
