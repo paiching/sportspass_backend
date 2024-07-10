@@ -54,12 +54,14 @@ router.post('/ecpay-return', async (req, res) => {
 
 
 router.get('/', (req, res) => {
+  //<form action="/api/v1/green/createOrder" method="POST">
   res.send(`
-    <form action="/green/createOrder" method="POST">
+    <form action="/api/v1/green/checkout" method="POST">
       <label for="itemName">Item Name:</label>
       <input type="text" id="itemName" name="itemName"><br>
       <label for="itemPrice">Item Price:</label>
       <input type="text" id="itemPrice" name="itemPrice"><br>
+      <input type="text" id="orderID" name="orderID"><br>
       <button type="submit">Create Order</button>
     </form>
   `);
@@ -132,8 +134,8 @@ router.post('/checkout', (req, res) => {
   const create = new ecpay_payment(options);
   const htm = create.payment_client.aio_check_out_all(parameters = base_param, invoice = inv_params);
   console.log(htm);
-  //res.render('checkout',{title: 'Express', checkoutForm: htm});
-  res.send(htm);
+  res.render('checkout',{title: 'Express', checkoutForm: htm});
+  //res.send(htm);
 });
 
 
