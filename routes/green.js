@@ -38,6 +38,8 @@ router.post('/ecpay-return', async (req, res) => {
   if (verifyCheckMacValue(data)) {
       if (data.RtnCode === '1') {
           const orderID = data.CustomField1;
+
+          //1|OK 觸發clientbackURL
           // 交易成功，更新訂單狀態
           await updateOrderStatus(orderID, 1);
           res.status(200).send('OK');
@@ -56,7 +58,7 @@ router.post('/ecpay-return', async (req, res) => {
 router.get('/', (req, res) => {
   //<form action="/api/v1/green/createOrder" method="POST">
   res.send(`
-    <form action="/api/v1/green/checkout" method="POST">
+    <form action="https://sportspass-api-server.onrender.com/api/v1/green/checkout" method="POST">
       <label for="itemName">Item Name:</label>
       <input type="text" id="itemName" name="itemName"><br>
       <label for="itemPrice">Item Price:</label>
@@ -134,8 +136,8 @@ router.post('/checkout', (req, res) => {
   const create = new ecpay_payment(options);
   const htm = create.payment_client.aio_check_out_all(parameters = base_param, invoice = inv_params);
   console.log(htm);
-  res.render('checkout',{title: 'Express', checkoutForm: htm});
-  //res.send(htm);
+  //res.render('checkout',{title: 'Express', checkoutForm: htm});
+  res.send(htm);
 });
 
 
