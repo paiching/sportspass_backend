@@ -33,26 +33,21 @@ async function updateOrderStatus(orderID, status) {
 }
 
 router.post('/ecpay-return', async (req, res) => {
+  console.log('ECPay Return Data:', req.body);
   const data = req.body;
 
   if (verifyCheckMacValue(data)) {
-      if (data.RtnCode === '1') {
-          const orderID = data.CustomField1;
-
-          //1|OK 觸發clientbackURL
-          // 交易成功，更新訂單狀態
-          await updateOrderStatus(orderID, 1);
-          res.status(200).send('1|OK');
-      } else {
-          // 交易失敗，處理失敗邏輯
-          res.status(400).send('Transaction Failed');
-      }
+    if (data.RtnCode === '1') {
+      const orderID = data.CustomField1;
+      await updateOrderStatus(orderID, 1);
+      res.status(200).send('1|OK');
+    } else {
+      res.status(400).send('Transaction Failed');
+    }
   } else {
-      // 檢查碼驗證失敗
-      res.status(400).send('CheckMacValue Verification Failed');
+    res.status(400).send('CheckMacValue Verification Failed');
   }
 });
-
 
 
 router.get('/', (req, res) => {
@@ -84,7 +79,7 @@ router.post('/checkout', (req, res) => {
       TotalAmount: itemPrice,
       TradeDesc: '測試交易描述',
       ItemName: itemName,
-      ReturnURL: 'https://sportspass-api-server.onrender.com/api/v1/green/ecpay-return',
+      ReturnURL: process.env.ECPAY_RETURN_URL,
       ClientBackURL: 'https://node-js-frontend-2024-ruddy.vercel.app/member/myTicket/'+orderID,
       CustomField1: orderID
   };
