@@ -119,7 +119,7 @@ router.get('/profile/:id', verifyToken, async (req, res, next) => {
       };
     }));
 
-    const ordersWithModifiedFields = user.orders.map(order => {
+    const ordersWithModifiedFields = user.orders.length ? user.orders.map(order => {
       const orderObject = order.toObject();
       orderObject.ticketList = orderObject.ticketId.map(ticket => {
         const eventDetails = ticket.eventId || {}; // Ensure eventDetails is not null
@@ -141,7 +141,7 @@ router.get('/profile/:id', verifyToken, async (req, res, next) => {
       });
       delete orderObject.ticketId;
       return orderObject;
-    });
+    }) : [];
 
     res.status(200).json({
       status: 'success',
@@ -149,7 +149,7 @@ router.get('/profile/:id', verifyToken, async (req, res, next) => {
         user: {
           ...user.toObject(),
           focusedEvents,
-          orders: ordersWithModifiedFields // Include orders with detailed information
+          orders: ordersWithModifiedFields // Include orders with detailed information or empty array
         }
       }
     });
@@ -161,6 +161,7 @@ router.get('/profile/:id', verifyToken, async (req, res, next) => {
     });
   }
 });
+
 
 
 
