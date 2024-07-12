@@ -119,7 +119,7 @@ router.get('/profile/:id', verifyToken, async (req, res, next) => {
       };
     }));
 
-    const ordersWithModifiedFields = user.orders.length ? user.orders.map(order => {
+    const ordersWithModifiedFields = user.orders.map(order => {
       const orderObject = order.toObject();
       orderObject.ticketList = orderObject.ticketId.map(ticket => {
         const eventDetails = ticket.eventId || {}; // Ensure eventDetails is not null
@@ -141,7 +141,7 @@ router.get('/profile/:id', verifyToken, async (req, res, next) => {
       });
       delete orderObject.ticketId;
       return orderObject;
-    }) : [];
+    });
 
     res.status(200).json({
       status: 'success',
@@ -149,7 +149,7 @@ router.get('/profile/:id', verifyToken, async (req, res, next) => {
         user: {
           ...user.toObject(),
           focusedEvents,
-          orders: ordersWithModifiedFields // Include orders with detailed information or empty array
+          orders: ordersWithModifiedFields // Include orders with detailed information
         }
       }
     });
@@ -161,7 +161,6 @@ router.get('/profile/:id', verifyToken, async (req, res, next) => {
     });
   }
 });
-
 
 
 
@@ -537,31 +536,24 @@ router.delete('/:id', verifyToken, async (req, res, next) => {
 router.get('/:userId/order', verifyToken, async (req, res) => {
   try {
     const orders = await Order.find({ userId: req.params.userId })
-    .populate({
-      path: 'ticketId',
-      populate: [
-        {
-          path: 'eventId',
-          model: 'Event', // Model name of the event
-          select: 'eventName eventPic' // Specify the fields you want to include from the Event model
-        },
-        {
-          path: 'sessionId',
-          model: 'Session', // Model name of the session
-          select: 'sessionName sessionTime sessionPlace' // Specify the fields you want to include from the Session model
-        }
-      ]
-    });
-
-    if (!orders || orders.length === 0) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'No orders found for this user'
+      .populate({
+        path: 'ticketId',
+        populate: [
+          {
+            path: 'eventId',
+            model: 'Event', // Model name of the event
+            select: 'eventName eventPic' // Specify the fields you want to include from the Event model
+          },
+          {
+            path: 'sessionId',
+            model: 'Session', // Model name of the session
+            select: 'sessionName sessionTime sessionPlace' // Specify the fields you want to include from the Session model
+          }
+        ]
       });
-    }
 
-    // Convert ticketId to ticketList, eventId to eventDetail, and sessionId to sessionDetail
-    const ordersWithModifiedFields = orders.map(order => {
+    // 確保 orders 字段為空陣列而不是報錯
+    const ordersWithModifiedFields = orders.length ? orders.map(order => {
       const orderObject = order.toObject();
       orderObject.ticketList = orderObject.ticketId.map(ticket => {
         const eventDetails = ticket.eventId || {}; // Ensure eventDetails is not null
@@ -583,7 +575,7 @@ router.get('/:userId/order', verifyToken, async (req, res) => {
       });
       delete orderObject.ticketId;
       return orderObject;
-    });
+    }) : [];
 
     res.status(200).json({
       status: 'success',
@@ -596,6 +588,7 @@ router.get('/:userId/order', verifyToken, async (req, res) => {
     res.status(500).send("Error fetching orders by userId");
   }
 });
+
 
 
 
