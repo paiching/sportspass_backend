@@ -42,7 +42,7 @@ router.post('/ecpay-return', async (req, res) => {
           //1|OK 觸發clientbackURL
           // 交易成功，更新訂單狀態
           await updateOrderStatus(orderID, 1);
-          res.status(200).send('OK');
+          res.status(200).send('1|OK');
       } else {
           // 交易失敗，處理失敗邏輯
           res.status(400).send('Transaction Failed');
@@ -84,7 +84,8 @@ router.post('/checkout', (req, res) => {
       TotalAmount: itemPrice,
       TradeDesc: '測試交易描述',
       ItemName: itemName,
-      ReturnURL: 'https://sportspass-api-server.onrender.com/ecpay-return',
+      ReturnURL: 'https://sportspass-api-server.onrender.com/api/v1/green/ecpay-return',
+      ClientBackURL: 'https://node-js-frontend-2024-ruddy.vercel.app/member/myTicket/'+orderID,
       CustomField1: orderID
   };
 
