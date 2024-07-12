@@ -7,6 +7,7 @@ const  Event = require('../models/eventsModel'); // 確保正確引入 Event 模
 const User = require('../models/usersModel');
 const Ticket = require('../models/ticketsModel');
 const { Session } = require('../models/sessionsModel');
+const Subscription = require('../models/subscriptionModel');
 const verifyToken = require('../middlewares/verifyToken');
 const jwt = require('jsonwebtoken'); // 引入 jwt 模組
 
@@ -18,6 +19,7 @@ const getUserIdFromToken = (req) => {
   return decoded.id;
 };
 
+// 訂單建立路由
 router.post('/', verifyToken, async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -160,13 +162,58 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     // 更新用戶的訂單列表
-    try {
-      await User.findByIdAndUpdate(userId, {
-        $push: { orders: newOrder._id }
-      }, { session });
-    } catch (userUpdateError) {
-      console.error("Error updating user with new order data:", userUpdateError);
-      throw userUpdateError;
+    const userUpdateResult = await User.findByIdAndUpdate(userId, {
+      $push: { orders: newOrder._id, focusedEvents: eventId }
+    }, { session, new: true });
+
+    console.log("User update result:", userUpdateResult);
+
+    if (!userUpdateResult) {
+      throw new Error(`User with ID ${userId} not found`);
+    }
+
+    // 檢查 sponsorId 並創建 sponsor 類型的訂閱
+    const sponsorId = updatedEvent.sponsorId;
+    if (sponsorId) {
+      const newSponsorSubscription = new Subscription({
+        type: 'sponsor',
+        sponsorId: sponsorId,
+        userId: userId,
+        createdAt: new Date()
+      });
+
+      try {
+        const savedSponsorSubscription = await newSponsorSubscription.save({ session });
+        await User.findByIdAndUpdate(userId, {
+          $push: { subscribes: savedSponsorSubscription._id }
+        }, { session });
+      } catch (subscriptionError) {
+        console.error("Error creating sponsor subscription:", subscriptionError);
+        throw subscriptionError;
+      }
+    }
+
+    // 檢查 tags 並創建 tag 類型的訂閱
+    const tags = updatedEvent.tagList;
+    if (tags && tags.length) {
+      for (const tag of tags) {
+        const newTagSubscription = new Subscription({
+          type: 'tag',
+          tagId: tag,
+          userId: userId,
+          createdAt: new Date()
+        });
+
+        try {
+          const savedTagSubscription = await newTagSubscription.save({ session });
+          await User.findByIdAndUpdate(userId, {
+            $push: { subscribes: savedTagSubscription._id }
+          }, { session });
+        } catch (subscriptionError) {
+          console.error("Error creating tag subscription:", subscriptionError);
+          throw subscriptionError;
+        }
+      }
     }
 
     await session.commitTransaction();
@@ -185,6 +232,8 @@ router.post('/', verifyToken, async (req, res) => {
     res.status(500).send(`Error creating order: ${error.message}`);
   }
 });
+
+
 
 
 // READ all orders

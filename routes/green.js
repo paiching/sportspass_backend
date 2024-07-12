@@ -81,7 +81,7 @@ router.post('/checkout', (req, res) => {
       TradeDesc: '測試交易描述',
       ItemName: itemName,
       ReturnURL: process.env.ECPAY_RETURN_URL,
-      ClientBackURL: 'https://node-js-frontend-2024-ruddy.vercel.app/member/myTicket/'+orderID,
+      ClientBackURL: 'https://node-js-frontend-2024-ruddy.vercel.app/member/myTicket',
       CustomField1: orderID
   };
 
