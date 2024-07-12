@@ -19,18 +19,18 @@ function verifyCheckMacValue(data) {
 
 async function updateOrderStatus(orderID, status) {
   try {
-    // 使用 findById 查找訂單
-    const order = await Order.findById(orderID);
-    if (!order) {
-      console.error(`Order with ID ${orderID} not found`);
-      return;
-    }
-    order.status = status;
-    await order.save();
-    console.log(`Order with ID ${orderID} has been updated to status ${status}`);
+      const order = await Order.findById({ orderID });
+      if (!order) {
+          console.error(`Order with ID ${orderID} not found`);
+          return;
+      }
+      order.status = status;
+      await order.save();
+      console.log(`Order with ID ${orderID} has been updated to status ${status}`);
   } catch (error) {
-    console.error(`Error updating order status: ${error}`);
+      console.error(`Error updating order status: ${error}`);
   }
+}
 
 router.post('/ecpay-return', async (req, res) => {
   console.log('ECPay Return Data:', req.body);
